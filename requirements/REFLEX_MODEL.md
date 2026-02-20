@@ -1,532 +1,428 @@
-# Open-Think-Reflex: AI Reflex Formation and Decay System
+# Open-Think-Reflex 需求文档
 
-> **Version**: v1.0  
-> **Status**: Draft  
-> **Core Concept**: A system that mimics human reflex formation and decay for AI interactions
+> **版本**: v1.0  
+> **状态**: 草稿  
+> **核心概念**: AI反射形成与衰减系统
 
 ---
 
-## 1. Core Concept
+## 1. 核心概念
 
-### 1.1 Brain vs Reflex Analogy
+### 1.1 大脑与反射的类比
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Human Nervous System                         │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  🧠 Brain (Complex Thinking)                                 │
-│  ├── Creative thinking                                        │
-│  ├── Complex reasoning                                        │
-│  ├── Long-term planning                                       │
-│  └── Abstract concept understanding                           │
-│                                                                 │
-│  🦠 Reflex (Automatic Response)                              │
-│  ├── Knee-jerk reflex                                        │
-│  ├── Blinking reflex                                         │
-│  ├── Withdrawal reflex                                       │
-│  └── Muscle memory                                          │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+人类神经系统              AI系统
+─────────────────────────────────────────────
+大脑（复杂思考）       AI大模型（通用智能）
+  ↓                      ↓
+脊髓反射（自动化）       代码/模式（快速响应）
 ```
 
-### 1.2 Core Philosophy
-
-> **AI = Brain**  
-> **Code/Pattern = Reflex**
-
-The system mimics how human brains form and decay reflexes:
-- Brain handles complex decisions
-- Reflexes handle automatic responses
-- Formation requires repetition
-- Decay occurs without reinforcement
+**核心观点**：
+- 大脑 = 大模型（慢速思考）
+- 反射 = 代码/模式（快速执行）
+- 反射形成需要重复强化
+- 反射衰减因为不使用
 
 ---
 
-## 2. Reflex Lifecycle Model
+## 2. 反射生命周期模型
+
+### 2.1 七阶段模型
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Reflex Lifecycle                            │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Establish ──► Reinforce ──► Threshold ──► Initial Reflex ──► Strengthen │
-│                                      │                                           │
-│                                      ▼                                           │
-│                              【Reflex Formation Zone】                       │
-│                                                                 │
-│              Deep Reflex ◄── Strengthen ◄─────────┐           │
-│                   │                                 │           │
-│                   │                                 │           │
-│                   │      【Reflex Maintenance Zone】│           │
-│                   │                                 ▼           │
-│                   │                        Decay ──► Degrade ──► Lost │
-│                   │                                 │           │
-│                   └─────────────────────────────────┘           │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+建立印象 ──► 强化 ──► 达成阈值 ──► 初步反射 ──► 加强
+                │                                    │
+                │                                    ▼
+                │                             【反射形成区】
+                │                                    │
+                │                                    ▼
+                │                              深度反射（永久）
+                │
+                ▼
+         不用 → 降级 → 丧失
 ```
 
----
+### 2.2 各阶段特征
 
-## 3. Lifecycle Stages
+| 阶段 | 强度 | 感知 | 可逆性 |
+|------|------|------|--------|
+| 建立印象 | 10% | 强 | 易 |
+| 强化 | 30% | 中 | 可逆 |
+| 达成阈值 | 50% | 弱 | 尚可 |
+| 初步反射 | 70% | 无 | 可逆 |
+| 加强 | 85% | 无 | 难 |
+| 深度反射 | 100% | 无 | 极难 |
+| 衰减 | ↓ | 弱 | 可逆 |
+| 丧失 | 0% | 强 | 重新开始 |
 
-### 3.1 Stage 1: Establish Impression
-
-| Attribute | Description |
-|-----------|-------------|
-| **Trigger** | First encounter with a pattern |
-| **Expression** | Aware of "this exists" |
-| **Perception** | Brain actively participates |
-| **Strength** | Weak (easily forgotten) |
-
-**Example**: First time hearing "pagination API needs pageSize and pageNum"
-
----
-
-### 3.2 Stage 2: Reinforce
-
-| Attribute | Description |
-|-----------|-------------|
-| **Trigger** | Repeated exposure to same pattern |
-| **Expression** | Starting to become familiar |
-| **Perception** | Brain begins to habituate |
-| **Strength** | Medium |
-
-**Example**: 3rd time hearing about pagination parameters
-
----
-
-### 3.3 Stage 3: Threshold Reached
-
-| Attribute | Description |
-|-----------|-------------|
-| **Trigger** | Repetition reaches certain count |
-| **Expression** | "Muscle memory" prototype forming |
-| **Perception** | Partially unconscious |
-| **Strength** | Threshold breakthrough |
-
-**Example**: 5th time → brain starts automatic association
-
----
-
-### 3.4 Stage 4: Initial Reflex
-
-| Attribute | Description |
-|-----------|-------------|
-| **Trigger** | After threshold is reached |
-| **Expression** | Direct response without thinking |
-| **Perception** | Brain not involved |
-| **Strength** | Stable reflex formed |
-
-**Example**: Hearing "API" → automatically thinking of pagination parameters
-
----
-
-### 3.5 Stage 5: Strengthen
-
-| Attribute | Description |
-|-----------|-------------|
-| **Trigger** | Continuous usage/reinforcement |
-| **Expression** | Reflex becomes more solid |
-| **Perception** | Completely unconscious |
-| **Strength** | Elevated to deep level |
-
-**Example**: Every API call automatically includes pagination → deeply internalized
-
----
-
-### 3.6 Stage 6: Deep Reflex (Permanent)
-
-| Attribute | Description |
-|-----------|-------------|
-| **Trigger** | Long-term continuous reinforcement |
-| **Expression** | Never forgotten |
-| **Perception** | Completely unconscious |
-| **Strength** | Permanently solidified |
-
-**Example**: Like riding a bicycle, writing APIs with pagination becomes instinctive
-
----
-
-### 3.7 Stage 7: Decay (Non-Permanent Reflex)
-
-| Attribute | Description |
-|-----------|-------------|
-| **Trigger** | Long-term non-usage |
-| **Expression** | Reflex becomes weaker |
-| **Perception** | Needs reactivation |
-| **Strength** | Gradually decreasing |
-
-**Example**: 3 months without writing paginated APIs → needs reminder next time
-
----
-
-## 4. Comparison Table
-
-| Stage | Perception | Reversibility | Strength |
-|--------|-------------|----------------|-----------|
-| Establish Impression | Strong | Easy | 10% |
-| Reinforce | Medium | Reversible | 30% |
-| Threshold | Weak | Passable | 50% |
-| Initial Reflex | None | Reversible | 70% |
-| Strengthen | None | Difficult | 85% |
-| Deep Reflex | None | Extremely Difficult | 100% |
-| Decay | Weak | Reversible | ↓ |
-| Lost | Strong | Restart | 0% |
-
----
-
-## 5. Application Scenarios
-
-### 5.1 AI Prompt Design
-
-```
-User corrects AI: "API needs pagination"
-  │
-  ▼
-Establish Impression (10%)
-  │
-  ▼
-User corrects/uses again
-  │
-  ▼
-Reinforce (30%)
-  │
-  ▼
-Multiple times
-  │
-  ▼
-Threshold Reached (50%)
-  │
-  ▼
-AI automatically includes pagination (Initial Reflex - 70%)
-  │
-  ▼
-Continuous usage
-  │
-  ▼
-Deep Reflex (100%)
-```
-
----
-
-### 5.2 Code Standards
-
-```
-New standard: "Use camelCase for variables"
-  │
-  ▼
-Establish Impression (10%)
-  │
-  ▼
-Multiple corrections in Review
-  │
-  ▼
-Reinforce (30%)
-  │
-  ▼
-Threshold Reached (50%)
-  │
-  ▼
-Developers automatically write camelCase (Initial Reflex - 70%)
-  │
-  ▼
-Continuous usage
-  │
-  ▼
-Deep Reflex (100%)
-```
-
----
-
-### 5.3 User Preference Learning
-
-```
-User preference: "I want dark mode"
-  │
-  ▼
-AI remembers (10%)
-  │
-  ▼
-User requests multiple times
-  │
-  ▼
-Reinforce (30%)
-  │
-  ▼
-Threshold Reached (50%)
-  │
-  ▼
-Automatic dark mode (Initial Reflex - 70%)
-  │
-  ▼
-Continuous usage
-  │
-  ▼
-Deep Reflex (100%)
-```
-
----
-
-## 6. Decay Mechanism
-
-### 6.1 Decay Curve
-
-```
-Reflex Strength Decay Curve:
-
-Strength
-100% │ Deep Reflex ────────────────┐
-     │                             │
- 85% │ Strengthen ────────┐        │
-     │                      │        │ Decay
- 70% │ Initial Reflex ───┤        │  Curve
-     │                      │        │
- 50% │ Threshold ────────┤        │
-     │                      │        │
- 30% │ Reinforce ────────┤        │
-     │                      │        │
- 10% │ Establish ────────┤        │
-     │                      │        │
-  0% └──────────────────┴────────┴─────────→ Time
-         0     7 days  14 days  30 days
-```
-
-### 6.2 Decay Formula
+### 2.3 衰减公式
 
 ```
 Strength(t) = Strength_initial × e^(-λ × t)
 
-Where:
-- λ = decay constant (varies by reflex type)
-- t = time since last reinforcement
-- Strength_initial = strength at peak
+其中：
+- λ = 衰减常数（因反射类型而异）
+- t = 距离上次强化的时间
 ```
 
 ---
 
-## 7. System Design Principles
+## 3. 功能需求
 
-### 7.1 AI Interaction Design
+### 3.1 核心功能
 
-| Stage | AI Behavior | User Experience |
-|--------|--------------|-----------------|
-| Establish | Remember this interaction | AI knows what I want |
-| Reinforce | Correlate subsequent interactions | AI gets more accurate |
-| Threshold | Proactively apply | AI helps me automatically |
-| Initial | No need for reminders | AI is faster than me |
-| Strengthen | Continuous optimization | Feels like "understanding me" |
-| Deep | Permanent memory | Complete trust |
-| Decay | Mark as weakening | Needs one reminder |
-| Lost | Reset state | Need to relearn |
+| 功能 | 描述 | 优先级 |
+|------|------|--------|
+| 对话中建立反射 | 从对话中提取和存储模式 | P0 |
+| 反射匹配 | 匹配用户输入与已有反射 | P0 |
+| 反射树展示 | 可视化展示反射路径 | P1 |
+| 用户选择 | 手动或自动选择反射路径 | P1 |
+| 反射衰减 | 自动衰减不使用的反射 | P2 |
 
----
+### 3.2 反射存储
 
-### 7.2 Memory Hierarchy
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Memory Hierarchy                           │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  L1: Current Conversation                                    │
-│  └── Patterns within context window                         │
-│                                                                 │
-│  L2: Session Memory                                        │
-│  └── Patterns learned in this session                       │
-│                                                                 │
-│  L3: Long-term Memory                                      │
-│  └── Cross-session patterns (user preferences)              │
-│                                                                 │
-│  L4: Permanent Storage                                     │
-│  └── Deep reflexes (never decay)                           │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+```typescript
+interface Pattern {
+  id: string;                    // 唯一标识
+  trigger: string;                 // 触发词
+  response: string;               // 响应路径
+  strength: number;              // 强度 0-100
+  threshold: number;             // 激活阈值
+  connections: string[];         // 关联反射
+  metadata: {
+    created: number;
+    updated: number;
+    reinforcementCount: number;
+    decayCount: number;
+  };
+}
 ```
 
 ---
 
-## 8. Implementation Requirements
+## 4. 用户故事
 
-### 8.1 Core Components
-
-1. **Pattern Extractor**
-   - Extract patterns from conversations
-   - Identify repetition frequency
-   - Calculate reinforcement score
-
-2. **Memory Manager**
-   - L1-L4 memory hierarchy
-   - Persistence layer
-   - Decay calculator
-
-3. **Threshold Detector**
-   - Monitor pattern strength
-   - Trigger reflex formation
-   - Manage state transitions
-
-4. **Decay Engine**
-   - Calculate decay rates
-   - Manage reflex degradation
-   - Trigger re-learning when needed
-
-### 8.2 API Endpoints (Draft)
+### 4.1 建立反射
 
 ```
-# Memory Management
-POST   /api/v1/memory/establish      # Establish impression
-POST   /api/v1/memory/reinforce     # Reinforce pattern
-GET    /api/v1/memory/status        # Get pattern status
-DELETE /api/v1/memory/decay         # Manual decay trigger
+作为用户，我想让AI学习我的偏好，
+所以它能按我的方式响应。
 
-# Threshold Detection
-POST   /api/v1/threshold/check      # Check if threshold reached
-POST   /api/v1/threshold/activate     # Activate reflex
+场景1：直接纠正
+给定：反射强度30
+当我：纠正AI响应
+那么：反射强度增加10
+并且：我可以看到更新后的强度
 
-# Decay Management
-GET    /api/v1/decay/calculate      # Calculate decay
-POST   /api/v1/decay/refresh        # Refresh a decaying reflex
-DELETE /api/v1/decay/purge          # Remove lost reflexes
+场景2：多次纠正
+给定：同一反射纠正4次
+当：强度达到70
+那么：跨越阈值
+并且：AI开始自动应用
 ```
 
----
-
-## 9. Use Cases
-
-### 9.1 Chatbot Preference Learning
+### 4.2 展示反射树
 
 ```
-Scenario: User always wants short responses
-  │
-  ▼
-Establish: User says "be more concise"
-  │
-  ▼
-Reinforce: User reminds 2-3 times
-  │
-  ▼
-Threshold: 5th time
-  │
-  ▼
-Initial Reflex: Bot automatically gives short responses
-  │
-  ▼
-Strengthen: Continuous short responses
-  │
-  ▼
-Deep Reflex: Bot never gives long responses
-  │
-  ▼
-Decay: User stops using bot for 30 days
-  │
-  ▼
-Degrade: Bot starts giving longer responses
+作为用户，我想看到已建立的反射，
+所以我能理解AI学到了什么。
+
+验收标准：
+- CLI命令显示反射树
+- 反射以树状结构展示
+- 每个反射显示强度指示
+- 阈值线可见
+- 活跃反射高亮
+- 潜伏反射淡化
+```
+
+### 4.3 选择反射路径
+
+```
+作为用户，我想选择应用的反射路径，
+所以我能指导AI的响应。
+
+场景1：手动选择
+给定：3个匹配反射（85、72、45分）
+当：我查看反射树
+那么：我看到所有反射按分数排序
+并且：我可以选择任意一个
+并且：AI应用我选择的反射
+
+场景2：自动选择
+给定：反射分数92（高于阈值）
+当：我给出匹配输入
+那么：AI自动应用
+并且：我看到自动选择通知
 ```
 
 ---
 
-### 9.2 Code Review Assistant
+## 5. 反射树示例
 
 ```
-Scenario: Team wants camelCase variable names
-  │
-  ▼
-Establish: Reviewer corrects once
-  │
-  ▼
-Reinforce: Reviewer corrects 3 times
-  │
-  ▼
-Threshold: 5 corrections
-  │
-  ▼
-Initial Reflex: AI automatically checks camelCase
-  │
-  ▼
-Strengthen: All code reviews include camelCase check
-  │
-  ▼
-Deep Reflex: Team never forgets camelCase
-  │
-  ▼
-Decay: No code reviews for 60 days
-  │
-  ▼
-Degrade: AI needs reminder
+用户输入: "写个用户API"
+
+匹配反射:
+└── user_api
+    ├── pagination (分页) ────── 85%
+    │   └── pageSize, pageNum
+    ├── response (响应) ───── 70%
+    │   └── code, message, data
+    ├── error (错误) ────── 60%
+    │   └── errorCode, errorMsg
+    └── logging (日志) ───── 50%
+        └── logLevel, logPath
+
+用户可以:
+- 选择路径 (/pagination + /response)
+- 修改权重
+- 添加新反射分支
 ```
 
 ---
 
-## 10. Future Vision
+## 6. 技术设计
 
-### 10.1 Ideal State
+### 6.1 系统架构
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Ideal Reflex System                         │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  User: "Do X"                                                │
-│  AI: (Automatic reflex) → Executes X                         │
-│                                                                 │
-│  No need to:                                                  │
-│  ├── Explain how to do X every time                         │
-│  ├── Correct the same mistakes repeatedly                    │
-│  └── Remind AI of preferences                              │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│             CLI Interface                │
+│  (Shell / Terminal / API / Web)        │
+└──────────────────┬────────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────────┐
+│              Core Engine                  │
+│  ┌──────────┐ ┌──────────┐ ┌────────┐ │
+│  │ Stimulus │ │Perception│ │Activate│ │
+│  │Processor│ │  Engine  │ │ Engine │ │
+│  └──────────┘ └──────────┘ └────────┘ │
+└──────────────────┬────────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────────┐
+│            Storage Backend              │
+│  (JSON / SQLite / Vector / Graph)    │
+└─────────────────────────────────────────┘
 ```
 
-### 10.2 Long-term Goals
+### 6.2 核心接口
 
-1. **Zero-Instruction Execution**
-   - AI learns user intent from minimal cues
-   - No explicit instructions needed
+```typescript
+// 反射处理器
+interface PatternProcessor {
+  extract(stimulus: string): PatternCandidate[];
+  match(input: string): MatchResult[];
+  reinforce(patternId: string, delta: number): void;
+}
 
-2. **Proactive Assistance**
-   - AI predicts needs before user asks
-   - Reflex triggers automatically
-
-3. **Personalized Intelligence**
-   - Each user develops unique reflex set
-   - AI becomes personalized assistant
-
----
-
-## 11. Conclusion
-
-> **Reflex = Repetition × Reinforcement - Time Decay**
-> 
-> Formation requires **repetition**, maintenance requires **usage**, loss occurs from **disuse**.
-
-### Core Principles
-
-| Principle | Description |
-|-----------|-------------|
-| **Pattern Recognition** | Identify repeating patterns |
-| **Reinforcement** | Strengthen through repetition |
-| **Threshold** | Cross the formation line |
-| **Automatic** | Execute without thinking |
-| **Decay** | Degrade without reinforcement |
+// 匹配结果
+interface MatchResult {
+  patternId: string;
+  score: number;        // 0-100
+  matchedElement: string;
+  path: string[];
+}
+```
 
 ---
 
-## Appendix: Glossary
+## 7. 存储设计
 
-| Term | Definition |
-|------|-------------|
-| **Establish** | First contact with a pattern |
-| **Reinforce** | Strengthen through repetition |
-| **Threshold** | Formation trigger point |
-| **Initial Reflex** | First level of automatic response |
-| **Deep Reflex** | Permanent, strong reflex |
-| **Decay** | Gradual weakening without usage |
-| **Memory Hierarchy** | L1-L4 storage levels |
+### 7.1 支持的后端
+
+| 后端 | 适用场景 | 优势 |
+|------|----------|------|
+| JSON | 简单、小规模 | 可读性好、版本控制 |
+| SQLite | 中等规模 | 查询、事务 |
+| Vector DB | 语义匹配 | 快速相似度搜索 |
+| Graph DB | 关系复杂 | 关系遍历 |
+
+### 7.2 数据结构
+
+```json
+{
+  "patterns": [
+    {
+      "id": "user_api_pagination",
+      "trigger": "用户API",
+      "response": "/api/users?pageSize=10&pageNum=1",
+      "strength": 85,
+      "threshold": 50,
+      "connections": ["user_api_response", "user_api_error"],
+      "metadata": {
+        "created": 1700000000,
+        "updated": 1700100000,
+        "reinforcementCount": 5
+      }
+    }
+  ],
+  "connections": [
+    {
+      "source": "user_api_pagination",
+      "target": "user_api_response",
+      "type": "sequential"
+    }
+  ]
+}
+```
 
 ---
 
-**Document Version**: v1.0  
-**Created**: 2026-02-20  
-**Project**: open-think-reflex  
-**Language**: English
+## 8. 用户交互
+
+### 8.1 CLI命令
+
+```bash
+# 查看反射树
+otr tree
+
+# 添加反射
+otr add "触发词" "响应路径"
+
+# 测试匹配
+otr match "输入文本"
+
+# 查看反射状态
+otr status
+
+# 手动强化
+otr reinforce <id> +10
+
+# 导出反射
+otr export patterns.json
+```
+
+### 8.2 交互流程
+
+```
+1. 用户输入
+2. CLI拦截 → 匹配反射
+3. 显示匹配树（带分数）
+4. 用户选择或自动应用
+5. 输出给AI
+6. 收集反馈 → 强化反射
+```
+
+---
+
+## 9. 衰减机制
+
+### 9.1 衰减规则
+
+| 反射类型 | 衰减常数(λ) | 说明 |
+|----------|--------------|------|
+| 短期反射 | 0.1/天 | 快速衰减 |
+| 中期反射 | 0.01/天 | 中等衰减 |
+| 长期反射 | 0.001/天 | 缓慢衰减 |
+| 永久反射 | 0 | 不衰减 |
+
+### 9.2 衰减曲线
+
+```
+强度
+100% │ 深度反射 ────────────────┐
+     │                             │
+ 85% │ 加强 ────────┐              │
+     │              │ 衰减曲线    │
+ 70% │ 初步反射 ──┤              │
+     │              │              │
+ 50% │ 阈值 ──────┤              │
+     │              │              │
+ 30% │ 强化 ──────┤              │
+     │              │              │
+ 10% │ 建立 ──────┘              │
+     │                             │
+  0% └──────────────────┴──────────→ 时间
+       0    7天   14天   30天
+```
+
+---
+
+## 10. 应用场景
+
+### 10.1 Chatbot偏好学习
+
+```
+用户总是要简洁回复
+↓
+建立印象（用户说"简洁点"）
+↓
+强化（提醒2-3次）
+↓
+达成阈值（5次）
+↓
+初步反射（AI自动简洁回复）
+↓
+加强（持续简洁）
+↓
+深度反射（永远简洁）
+```
+
+### 10.2 代码审查助手
+
+```
+团队想要camelCase变量名
+↓
+审查者纠正1次（建立印象）
+↓
+审查者纠正3次（强化）
+↓
+5次纠正（达成阈值）
+↓
+AI自动检查camelCase（初步反射）
+↓
+持续使用（加强）
+↓
+深度反射（团队永远记住）
+```
+
+---
+
+## 11. 未来展望
+
+### 11.1 理想状态
+
+```
+用户说"做X"
+AI（自动反射）→ 执行X
+
+不需要：
+- 每次解释怎么做X
+- 重复纠正同样错误
+- 提醒AI偏好
+```
+
+### 11.2 长期目标
+
+1. **零指令执行**
+   - AI从最小线索学习用户意图
+   - 不需要显式指令
+
+2. **主动协助**
+   - AI预测用户需求
+   - 自动触发反射
+
+3. **个性化智能**
+   - 每个用户发展独特的反射集
+   - AI成为个性化助手
+
+---
+
+## 12. 文档索引
+
+| 文档 | 内容 |
+|------|------|
+| REFLEX_MODEL.md | 核心概念和生命周期模型 |
+| 02-PROTOCOL.md | 协议接口设计（技术） |
+| 03-USER_STORIES.md | 用户故事和交互流程（用户视角） |
+| 04-ARCHITECTURE.md | 系统架构和技术实现（技术） |
+
+---
+
+**文档版本**: v1.0  
+**创建时间**: 2026-02-20  
+**项目**: open-think-reflex
