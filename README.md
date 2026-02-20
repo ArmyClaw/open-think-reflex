@@ -1,53 +1,59 @@
 # Open-Think-Reflex
 
-AI Reflex Formation and Decay System - Mimicking how human brains form and decay reflexes for AI interactions.
+> **AI输入加速器** - 通过反射机制加速人与AI的交互
 
-## Core Concept
+## 核心概念
 
-> **AI = Brain** (Complex Thinking)  
-> **Code/Pattern = Reflex** (Automatic Response)
+> **AI = 大脑**（复杂思考）  
+> **反射 = 快捷指令**（快速响应）
 
-This project implements a system that mimics human reflex formation and decay:
-- Brain handles complex decisions
-- Reflexes handle automatic responses
-- Formation requires repetition
-- Decay occurs without reinforcement
+这个项目实现了一套反射形成系统，模仿人类形成反射的过程：
+- **大脑** 处理复杂推理
+- **反射** 处理高频操作
+- 重复使用 → 形成反射
+- 长期不用 → 自动衰减
 
-## Reflex Lifecycle
+## 应用场景
 
 ```
-Establish ──► Reinforce ──► Threshold ──► Initial Reflex ──► Strengthen ──► Deep Reflex
-                                      │                                     │
-                                      ▼                                     │
-                              【Reflex Formation Zone】                      │
-                                                                              │
-                                  Decay ──► Degrade ──► Lost               │
-                                                                              │
-                              【Reflex Maintenance Zone】                   │
+用户输入"用户API"
+    │
+    ▼
+┌─────────────────────────────────────┐
+│ 思维链树展开                        │
+│ ├── 分页 pagination ───── 85%       │
+│ ├── 响应 response ───── 70%        │
+│ └── 错误 error ───────── 60%       │
+└─────────────────────────────────────┘
+    │
+    ▼
+用户选择"分页" → 按空格 → AI生成完整代码
 ```
 
-## Documentation
+## v1.0 目标
 
-- [Reflex Model Specification](requirements/REFLEX_MODEL.md) - Detailed lifecycle model and requirements
+| 功能 | 状态 | 说明 |
+|------|------|------|
+| 反射形成 | ✅ | 匹配→强化→阈值→激活 |
+| 快捷键触发 | ✅ | ↑↓选择 → 空格生成 |
+| 本地存储 | 🔶 | SQLite |
+| 衰减机制 | 🔶 | 自动衰减长期未用的反射 |
 
-## Quick Start
+## 快速开始
 
 ```bash
-# Clone the repository
 git clone https://github.com/ArmyClaw/open-think-reflex.git
 cd open-think-reflex
-
-# Explore the requirements
 cat requirements/REFLEX_MODEL.md
 ```
 
-## Vision
+## v2.0 规划
 
-Build an AI system that:
-- Learns from user interactions
-- Forms automatic reflexes
-- Decays unused patterns
-- Becomes personalized over time
+- **经验导出** - 将反射导出为AgentSkill，AI辅助润色实现经验复用
+- 项目空间隔离
+- 思绪整理模式
+- 导出与同步
+- 多人协作
 
 ## License
 
