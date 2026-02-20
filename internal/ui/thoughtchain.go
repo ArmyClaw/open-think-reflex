@@ -7,12 +7,22 @@ import (
 	"github.com/rivo/tview"
 )
 
+// ThoughtChainNode represents a node in the thought chain tree
+type ThoughtChainNode struct {
+	Result    *contracts.MatchResult
+	Children  []*ThoughtChainNode
+	Expanded  bool
+	Level     int
+}
+
 // ThoughtChainView displays the thought chain tree (Layer 1)
 type ThoughtChainView struct {
 	view     *tview.TextView
 	theme    *Theme
 	results  []contracts.MatchResult
+	nodes    []*ThoughtChainNode
 	selected int
+	focused  bool
 }
 
 // NewThoughtChainView creates a new thought chain view
@@ -20,6 +30,7 @@ func NewThoughtChainView(theme *Theme) *ThoughtChainView {
 	v := &ThoughtChainView{
 		theme:    theme,
 		selected: 0,
+		focused:  false,
 	}
 	
 	v.view = tview.NewTextView().
@@ -36,16 +47,55 @@ func NewThoughtChainView(theme *Theme) *ThoughtChainView {
 	return v
 }
 
-// SetResults sets the match results to display
+// SetResults sets the match results to display and builds tree nodes
 func (v *ThoughtChainView) SetResults(results []contracts.MatchResult) {
 	v.results = results
 	v.selected = 0
+	
+	// Build tree nodes from flat results
+	v.nodes = v.buildTree(results)
 	v.render()
+}
+
+// buildTree converts flat results into a tree structure
+func (v *ThoughtChainView) buildTree(results []contracts.MatchResult) []*ThoughtChainNode {
+	nodes := make([]*ThoughtChainNode, len(results))
+	
+	for i, r := range results {
+		node := &ThoughtChainNode{
+			Result:   &r,
+			Children:  nil,
+			Expanded:  i < 3, // Auto-expand first 3
+			Level:    0,
+		}
+		
+		// Add simulated children for visual tree effect
+		if r.Confidence > 80 {
+			node.Children = []*ThoughtChainNode{
+				{Result: &r, Expanded: false, Level: 1},
+			}
+		}
+		
+		nodes[i] = node
+	}
+	
+	return nodes
+}
+
+// SetFocused sets the focus state
+func (v *ThoughtChainView) SetFocused(focused bool) {
+	v.focused = focused
+	if focused {
+		v.view.SetBorderColor(v.theme.Accent)
+	} else {
+		v.view.SetBorderColor(v.theme.Border)
+	}
 }
 
 // Clear clears the thought chain
 func (v *ThoughtChainView) Clear() {
 	v.results = nil
+	v.nodes = nil
 	v.selected = 0
 	v.view.SetText("")
 }
@@ -57,17 +107,41 @@ func (v *ThoughtChainView) Selected() int {
 
 // SelectNext selects the next item
 func (v *ThoughtChainView) SelectNext() {
-	if len(v.results) > 0 {
-		v.selected = (v.selected + 1) % len(v.results)
-		v.render()
+	max := len(v.results)
+	if max == 0 {
+		return
 	}
+	v.selected = (v.selected + 1) % max
+	v.render()
 }
 
 // SelectPrev selects the previous item
 func (v *ThoughtChainView) SelectPrev() {
-	if len(v.results) > 0 {
-		v.selected = (v.selected - 1 + len(v.results)) % len(v.results)
-		v.render()
+	max := len(v.results)
+	if max == 0 {
+		return
+	}
+	v.selected = (v.selected - 1 + max) % max
+	v.render()
+}
+
+// Expand expands the selected node
+func (v *ThoughtChainView) Expand() {
+	if v.selected >= 0 && v.selected < len(v.nodes) {
+		if v.nodes[v.selected] != nil {
+			v.nodes[v.selected].Expanded = true
+			v.render()
+		}
+	}
+}
+
+// Collapse collapses the selected node
+func (v *ThoughtChainView) Collapse() {
+	if v.selected >= 0 && v.selected < len(v.nodes) {
+		if v.nodes[v.selected] != nil {
+			v.nodes[v.selected].Expanded = false
+			v.render()
+		}
 	}
 }
 
@@ -86,33 +160,84 @@ func (v *ThoughtChainView) render() {
 		return
 	}
 	
+	// Build title with mode indicator
+	selectedIndicator := ""
+	if v.focused {
+		selectedIndicator = fmt.Sprintf(" [[%s]NAV[white]]", v.theme.Accent)
+	}
+	v.view.SetTitle(fmt.Sprintf("💭 Thought Chain%s", selectedIndicator))
+	
 	text := ""
 	
 	for i, r := range v.results {
-		prefix := "  "
-		selected := false
-		
-		if i == v.selected {
-			prefix = "▶ "
-			selected = true
+		// Skip hidden children
+		if i > 0 && v.nodes[i-1] != nil && !v.nodes[i-1].Expanded && v.nodes[i].Level > 0 {
+			continue
 		}
+		
+		node := v.nodes[i]
+		if node == nil {
+			node = &ThoughtChainNode{Result: &v.results[i], Level: 0}
+		}
+		
+		prefix := v.getTreePrefix(node.Level, i == v.selected, node.Expanded)
+		selected := (i == v.selected && v.focused)
 		
 		// Format based on match type
 		matchType := r.Branch
+		icon := "🎯"
+		
+		switch r.Branch {
+		case "exact":
+			icon = "💯"
+		case "keyword":
+			icon = "🔑"
+		case "fuzzy":
+			icon = "🔍"
+		}
 		
 		if selected {
-			text += fmt.Sprintf("[%s]%s[%s] %s[white]\n", 
-				v.theme.Selected, prefix, v.theme.Accent, r.Pattern.Trigger)
-			text += fmt.Sprintf("     ├ Confidence: [%.0f%%] %s\n", r.Confidence, matchType)
-			text += fmt.Sprintf("     ├ Response: %s\n", truncate(r.Pattern.Response, 40))
-			text += fmt.Sprintf("     └ Strength: %.1f / %.1f\n", r.Pattern.Strength, r.Pattern.Threshold)
+			text += fmt.Sprintf("[%s]%s[white]\n", v.theme.Selected, prefix)
+			text += fmt.Sprintf("   ├ [%s]%s[white]\n", v.theme.Accent, r.Pattern.Trigger)
+			text += fmt.Sprintf("   ├ Confidence: [%.0f%%] %s\n", r.Confidence, matchType)
+			text += fmt.Sprintf("   ├ Response: %s\n", truncate(r.Pattern.Response, 35))
+			text += fmt.Sprintf("   └ Strength: %.1f / %.1f\n", r.Pattern.Strength, r.Pattern.Threshold)
 		} else {
-			text += fmt.Sprintf("%s[%s] %s[white] (%.0f%%)\n", 
-				prefix, v.theme.Secondary, r.Pattern.Trigger, r.Confidence)
+			text += fmt.Sprintf("%s[%s]%s[white] %s (%.0f%%)\n", 
+				prefix, v.theme.Secondary, icon, r.Pattern.Trigger, r.Confidence)
 		}
 	}
 	
 	v.view.SetText(text)
+}
+
+// getTreePrefix generates tree visualization prefix
+func (v *ThoughtChainView) getTreePrefix(level int, selected, expanded bool) string {
+	prefix := ""
+	
+	// Branch indicators
+	if level > 0 {
+		indent := ""
+		for i := 0; i < level; i++ {
+			indent += "   "
+		}
+		
+		expandIcon := "▶"
+		if expanded {
+			expandIcon = "▼"
+		}
+		
+		prefix = fmt.Sprintf("%s[%s]%s[white] ", indent, v.theme.Secondary, expandIcon)
+	} else {
+		// Top level
+		if selected {
+			prefix = "▶ "
+		} else {
+			prefix = "  "
+		}
+	}
+	
+	return prefix
 }
 
 func truncate(s string, maxLen int) string {

@@ -29,7 +29,18 @@ type App struct {
 	currentSpace *models.Space
 	patterns     []*models.Pattern
 	results      []contracts.MatchResult
+	mode         AppMode // input, navigation
 }
+
+// AppMode represents the current interaction mode
+type AppMode int
+
+const (
+	ModeInput     AppMode = iota // Default: typing in input
+	ModeNavigation              // Navigating thought chain
+)
+
+var currentMode = ModeInput
 
 // NewApp creates a new TUI application
 func NewApp(storage *sqlite.Storage) *App {
@@ -37,6 +48,7 @@ func NewApp(storage *sqlite.Storage) *App {
 		storage: storage,
 		matcher: matcher.NewEngine(),
 		theme:   DefaultTheme(),
+		mode:    ModeInput,
 	}
 	
 	a.app = tview.NewApplication()
@@ -114,8 +126,14 @@ func (a *App) createHeader() tview.Primitive {
 	if a.currentSpace != nil {
 		spaceName = a.currentSpace.Name
 	}
+	
+	modeText := "INPUT"
+	if a.mode == ModeNavigation {
+		modeText = "NAVIGATE"
+	}
+	
 	info := tview.NewTextView().
-		SetText(fmt.Sprintf("Space: %s | Patterns: %d | Press '?' for help | 'q' to quit", spaceName, patternCount)).
+		SetText(fmt.Sprintf("Space: %s | Patterns: %d | Mode: %s | [↑/↓] Navigate | [Tab] Switch Panel", spaceName, patternCount, modeText)).
 		SetTextColor(a.theme.Secondary).
 		SetTextAlign(tview.AlignCenter)
 	
@@ -165,11 +183,65 @@ func (a *App) createInputArea() tview.Primitive {
 func (a *App) setupKeyBindings() {
 	// Global key bindings
 	a.app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		// Tab to switch between input and thought chain
+		if event.Key() == tcell.KeyTab {
+			if a.mode == ModeInput {
+				a.mode = ModeNavigation
+				a.thoughtChain.SetFocused(true)
+				a.app.SetFocus(a.thoughtChain.view)
+			} else {
+				a.mode = ModeInput
+				a.thoughtChain.SetFocused(false)
+				a.app.SetFocus(a.input.view)
+			}
+			return nil
+		}
+		
+		// If in navigation mode, handle arrow keys
+		if a.mode == ModeNavigation {
+			switch event.Key() {
+			case tcell.KeyUp:
+				a.thoughtChain.SelectPrev()
+				a.updateOutputForSelection()
+				return nil
+			case tcell.KeyDown:
+				a.thoughtChain.SelectNext()
+				a.updateOutputForSelection()
+				return nil
+			case tcell.KeyLeft:
+				// Collapse or go back
+				a.thoughtChain.Collapse()
+				return nil
+			case tcell.KeyRight:
+				// Expand or select
+				a.thoughtChain.Expand()
+				a.updateOutputForSelection()
+				return nil
+			case tcell.KeyEnter:
+				// Use selected response
+				a.useSelectedResponse()
+				return nil
+			case tcell.KeyEsc:
+				// Return to input mode
+				a.mode = ModeInput
+				a.thoughtChain.SetFocused(false)
+				a.app.SetFocus(a.input.view)
+				return nil
+			}
+		}
+		
+		// Global shortcuts
 		switch event.Key() {
 		case tcell.KeyCtrlC:
 			a.Stop()
 			return nil
 		case tcell.KeyEsc:
+			if a.mode == ModeNavigation {
+				a.mode = ModeInput
+				a.thoughtChain.SetFocused(false)
+				a.app.SetFocus(a.input.view)
+				return nil
+			}
 			a.Stop()
 			return nil
 		case tcell.KeyRune:
@@ -180,10 +252,64 @@ func (a *App) setupKeyBindings() {
 			case '?':
 				a.showHelp()
 				return nil
+			case 'h':
+				// Left arrow equivalent
+				if a.mode == ModeNavigation {
+					a.thoughtChain.Collapse()
+				}
+				return nil
+			case 'l':
+				// Right arrow equivalent
+				if a.mode == ModeNavigation {
+					a.thoughtChain.Expand()
+					a.updateOutputForSelection()
+				}
+				return nil
+			case 'j':
+				// Down arrow equivalent
+				if a.mode == ModeNavigation {
+					a.thoughtChain.SelectNext()
+					a.updateOutputForSelection()
+				}
+				return nil
+			case 'k':
+				// Up arrow equivalent
+				if a.mode == ModeNavigation {
+					a.thoughtChain.SelectPrev()
+					a.updateOutputForSelection()
+				}
+				return nil
 			}
 		}
 		return event
 	})
+}
+
+// updateOutputForSelection updates the output panel based on current selection
+func (a *App) updateOutputForSelection() {
+	result := a.thoughtChain.GetSelectedResult()
+	if result != nil {
+		a.output.SetOutput(fmt.Sprintf("Selected: %s\n\nTrigger: %s\nResponse: %s\nConfidence: %.0f%% (%s)\nStrength: %.1f / %.1f\n\nPress [Enter] to use this response",
+			result.Pattern.Trigger,
+			result.Pattern.Trigger,
+			result.Pattern.Response,
+			result.Confidence,
+			result.Branch,
+			result.Pattern.Strength,
+			result.Pattern.Threshold))
+	}
+}
+
+// useSelectedResponse copies the selected response to clipboard or shows it
+func (a *App) useSelectedResponse() {
+	result := a.thoughtChain.GetSelectedResult()
+	if result != nil {
+		a.output.SetFormattedOutput("Response Copied!", 
+			fmt.Sprintf("✓ Copied to clipboard:\n\n%s", result.Pattern.Response))
+		
+		// TODO: Implement actual clipboard copy
+		// For now, just show a success message
+	}
 }
 
 func (a *App) handleInput(text string) {
@@ -198,7 +324,8 @@ func (a *App) handleInput(text string) {
 	}
 	
 	if len(activePatterns) == 0 {
-		a.output.SetOutput("No active patterns found (all below threshold)")
+		a.output.SetOutput("No active patterns found (all below threshold)\n\nTip: Use 'otr pattern create' to add patterns")
+		a.thoughtChain.Clear()
 		return
 	}
 	
@@ -222,31 +349,49 @@ func (a *App) handleInput(text string) {
 	a.thoughtChain.SetResults(results)
 	
 	// Update output with first match
-	a.output.SetOutput(fmt.Sprintf("Match found!\n\nTrigger: %s\nResponse: %s\nConfidence: %.0f%%",
+	a.output.SetOutput(fmt.Sprintf("Found %d match(es):\n\n1. %s\n   Confidence: %.0f%% (%s)\n   Response: %s\n\nUse [↑/↓] to navigate, [Enter] to select",
+		len(results),
 		results[0].Pattern.Trigger,
-		results[0].Pattern.Response,
-		results[0].Confidence))
+		results[0].Confidence,
+		results[0].Branch,
+		results[0].Pattern.Response))
 }
 
 func (a *App) showHelp() {
 	helpText := `
 Keyboard Shortcuts
-═══════════════════════════════════════════════════════════
+════════════════════════════════════════════════════════════
 
-[↑/↓]     Navigate thought branches
-[→]        Expand/select branch
-[←]        Go back
-[Enter]    Use selected response
-[Space]    Toggle selection
-[h/?]      Show this help
-[q/Esc]    Quit
+[Tab]       Switch between Input and Navigation mode
+[↑/↓]       Navigate thought branches (in Navigation mode)
+[←]         Collapse branch / Go back
+[→]         Expand branch / Select
+[Enter]     Use selected response
+[Space]     Toggle selection
+[h/?]       Show this help
+[q/Esc]     Quit
+
+Vim-style Shortcuts (Navigation mode)
+════════════════════════════════════════════════════════════
+
+[k]         Move up
+[j]         Move down
+[h]         Collapse / Go back
+[l]         Expand / Select
+[Esc]       Return to input mode
+
+Modes
+════════════════════════════════════════════════════════════
+
+INPUT:       Type queries in the input area
+NAVIGATE:    Use arrow keys to browse results
 
 Layers
-═══════════════════════════════════════════════════════════
+════════════════════════════════════════════════════════════
 
 Left Panel:   Thought Chain Tree - Shows AI reasoning branches
 Middle Panel: Output Content - Shows generated responses
-Bottom:       Input Area - Type your queries here
+Bottom:      Input Area - Type your queries here
 `
 	a.app.SetRoot(tview.NewModal().
 		SetText(helpText).
