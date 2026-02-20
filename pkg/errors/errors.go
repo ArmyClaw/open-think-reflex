@@ -91,8 +91,8 @@ func ValidationError(field, reason string, value interface{}) *Error {
 	}
 }
 
-// Common error codes
-const (
+// Common error variables
+var (
 	// Pattern errors (1000-1099)
 	ErrPatternNotFound     = New(Code("STORAGE_ERR_2001"), "Pattern not found")
 	ErrInvalidPatternID    = New(Code("PATTERN_ERR_1001"), "Invalid pattern ID format")

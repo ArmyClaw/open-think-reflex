@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ArmyClaw/open-think-reflex/internal/config"
 	"github.com/ArmyClaw/open-think-reflex/internal/data/sqlite"
 	"github.com/ArmyClaw/open-think-reflex/pkg/contracts"
 	"github.com/ArmyClaw/open-think-reflex/pkg/models"

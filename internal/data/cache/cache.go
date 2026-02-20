@@ -76,7 +76,7 @@ func (c *Cache) Clear() {
 }
 
 // evictOldest removes the oldest item from cache
-func (c *Cache) evict oldest() {
+func (c *Cache) evictOldest() {
 	var oldestKey string
 	var oldestTime time.Time
 
