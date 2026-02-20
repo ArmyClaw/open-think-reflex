@@ -14,11 +14,12 @@ import (
 
 // App represents the main TUI application
 type App struct {
-	app       *tview.Application
-	storage   *sqlite.Storage
-	matcher   *matcher.Engine
-	pages     *tview.Pages
-	theme     *Theme
+	app         *tview.Application
+	storage     *sqlite.Storage
+	matcher     *matcher.Engine
+	pages       *tview.Pages
+	theme       *Theme
+	themeManager *ThemeManager
 	
 	// Layers
 	thoughtChain *ThoughtChainView
@@ -44,11 +45,13 @@ var currentMode = ModeInput
 
 // NewApp creates a new TUI application
 func NewApp(storage *sqlite.Storage) *App {
+	themeManager := NewThemeManager()
 	a := &App{
-		storage: storage,
-		matcher: matcher.NewEngine(),
-		theme:   DefaultTheme(),
-		mode:    ModeInput,
+		storage:      storage,
+		matcher:      matcher.NewEngine(),
+		theme:        themeManager.Current(),
+		themeManager: themeManager,
+		mode:         ModeInput,
 	}
 	
 	a.app = tview.NewApplication()
@@ -252,6 +255,10 @@ func (a *App) setupKeyBindings() {
 			case '?':
 				a.showHelp()
 				return nil
+			case 't':
+				// Toggle theme
+				a.toggleTheme()
+				return nil
 			case 'h':
 				// Left arrow equivalent
 				if a.mode == ModeNavigation {
@@ -357,6 +364,28 @@ func (a *App) handleInput(text string) {
 		results[0].Pattern.Response))
 }
 
+// toggleTheme switches between light and dark themes
+func (a *App) toggleTheme() {
+	a.themeManager.Toggle()
+	a.theme = a.themeManager.Current()
+	
+	// Update UI elements with new theme
+	a.thoughtChain.theme = a.theme
+	a.output.theme = a.theme
+	a.input.theme = a.theme
+	
+	// Re-render
+	a.thoughtChain.render()
+	a.output.view.SetBackgroundColor(a.theme.Background)
+	a.output.view.SetBorderColor(a.theme.Border)
+	
+	a.input.view.SetFieldBackgroundColor(a.theme.Background)
+	a.input.view.SetFieldTextColor(a.theme.Text)
+	
+	// Show notification
+	a.output.SetStatus(fmt.Sprintf("Theme switched to %s", a.theme.Name), true)
+}
+
 func (a *App) showHelp() {
 	helpText := `
 Keyboard Shortcuts
@@ -368,6 +397,7 @@ Keyboard Shortcuts
 [→]         Expand branch / Select
 [Enter]     Use selected response
 [Space]     Toggle selection
+[t]         Toggle Light/Dark theme
 [h/?]       Show this help
 [q/Esc]     Quit
 
