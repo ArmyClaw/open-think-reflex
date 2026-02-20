@@ -2,9 +2,12 @@ package ai
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
+	"sync"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
@@ -145,29 +148,125 @@ func (p *ClaudeProvider) GenerateStream(ctx context.Context, req *Request) (io.R
 		}
 	}
 
-	// Create streaming response - returns *ssestream.Stream[MessageStreamEventUnion]
+	// Create streaming response
 	stream := p.client.Messages.NewStreaming(ctx, messageReq)
 
 	// Return a reader that wraps the stream
-	return &streamReader{stream: stream}, nil
+	return newStreamReader(stream), nil
 }
 
 // streamReader wraps the SSE stream to implement io.ReadCloser
 type streamReader struct {
-	stream *ssestream.Stream[anthropic.MessageStreamEventUnion]
+	stream   *ssestream.Stream[anthropic.MessageStreamEventUnion]
+	mu       sync.Mutex
+	buffer   []byte
+	closed   bool
 }
 
+// newStreamReader creates a new stream reader
+func newStreamReader(stream *ssestream.Stream[anthropic.MessageStreamEventUnion]) *streamReader {
+	return &streamReader{
+		stream: stream,
+		buffer: make([]byte, 0),
+	}
+}
+
+// Read implements io.Reader
 func (r *streamReader) Read(p []byte) (n int, err error) {
-	// This is a simplified implementation
-	// In production, you'd properly handle the SSE stream using Next() and Current()
-	return 0, io.EOF
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.closed {
+		return 0, io.EOF
+	}
+
+	// If we have buffered data, return it
+	if len(r.buffer) > 0 {
+		copy(p, r.buffer)
+		r.buffer = r.buffer[len(p):]
+		if len(r.buffer) == 0 {
+			return len(p), nil
+		}
+		return len(p), nil
+	}
+
+	// Try to read from stream
+	for {
+		if !r.stream.Next() {
+			r.closed = true
+			if err := r.stream.Err(); err != nil {
+				return 0, err
+			}
+			return 0, io.EOF
+		}
+
+		event := r.stream.Current()
+
+		// Handle different event types using type assertions
+		var text string
+		switch event.Type {
+		case "content_block_delta":
+			// Use the AsContentBlockDelta method to get the proper type
+			deltaEvent := event.AsContentBlockDelta()
+			text = string(deltaEvent.Delta.Text)
+		case "message_delta":
+			// Final message delta - can be used for usage stats
+		case "message_stop":
+			r.closed = true
+			return 0, io.EOF
+		}
+
+		if text != "" {
+			// Convert to SSE format
+			data := "data: " + text + "\n\n"
+			r.buffer = []byte(data)
+
+			copy(p, r.buffer)
+			r.buffer = r.buffer[len(p):]
+			return len(p), nil
+		}
+	}
 }
 
+// Close implements io.Closer
 func (r *streamReader) Close() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.closed = true
 	if r.stream != nil {
 		return r.stream.Close()
 	}
 	return nil
+}
+
+// StreamEvent represents a streaming event
+type StreamEvent struct {
+	Type      string          `json:"type"`
+	Delta     json.RawMessage `json:"delta,omitempty"`
+	Index     int             `json:"index,omitempty"`
+	Content   string          `json:"content,omitempty"`
+	Usage     *Usage          `json:"usage,omitempty"`
+	FinishReason string       `json:"finish_reason,omitempty"`
+}
+
+// parseStreamEvent parses a line from the stream
+func parseStreamEvent(line string) (*StreamEvent, error) {
+	if !strings.HasPrefix(line, "data: ") {
+		return nil, nil
+	}
+
+	data := strings.TrimPrefix(line, "data: ")
+	if data == "[DONE]" {
+		return &StreamEvent{Type: "stop"}, nil
+	}
+
+	var event StreamEvent
+	if err := json.Unmarshal([]byte(data), &event); err != nil {
+		return nil, fmt.Errorf("failed to parse stream event: %w", err)
+	}
+
+	return &event, nil
 }
 
 // ValidateKey validates the API key
