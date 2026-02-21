@@ -104,7 +104,7 @@ func (d *Database) Migrate(ctx context.Context) error {
 			user_id TEXT
 		)`,
 
-		// Indices
+		// Indices - Basic
 		`CREATE INDEX IF NOT EXISTS idx_patterns_trigger ON patterns(trigger)`,
 		`CREATE INDEX IF NOT EXISTS idx_patterns_strength ON patterns(strength)`,
 		`CREATE INDEX IF NOT EXISTS idx_patterns_project ON patterns(project)`,
@@ -112,6 +112,13 @@ func (d *Database) Migrate(ctx context.Context) error {
 		`CREATE INDEX IF NOT EXISTS idx_patterns_deleted ON patterns(deleted_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_events_type ON events(type)`,
 		`CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp)`,
+
+		// Indices - Performance optimization (Iter 43)
+		`CREATE INDEX IF NOT EXISTS idx_patterns_last_used_at ON patterns(last_used_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_patterns_updated_at ON patterns(updated_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_patterns_project_deleted ON patterns(project, deleted_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_patterns_strength_threshold ON patterns(strength, threshold)`,
+		`CREATE INDEX IF NOT EXISTS idx_patterns_decay_enabled ON patterns(decay_enabled)`,
 	}
 
 	for _, migration := range migrations {
