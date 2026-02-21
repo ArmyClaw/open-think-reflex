@@ -8,7 +8,7 @@
 
 ### 项目状态
 - **版本**: v1.1.0 (开发中)
-- **当前迭代**: Iter 48 ✅ 已完成
+- **当前迭代**: Iter 49 ✅ 已完成
 - **阶段**: Phase 6 - 性能优化
 
 ### Sprint 5 计划
@@ -26,6 +26,17 @@
   - BenchmarkSearchPatterns: 12K ops/s (98.5µs/op)
   - BenchmarkBatchSave: 2.7K ops/s (419µs/op)
 - JSON错误处理修复 (4处 json.Unmarshal 添加错误返回)
+- 所有测试通过 ✅
+
+### Iter 49 完成 ✅ (2026-02-21 22:30)
+- 查询结果缓存
+- 新增 QueryCache 结构体:
+  - TTL 支持 (默认 1 分钟)
+  - LRU 驱逐策略
+  - 命中率统计
+  - Get/Set/Invalidate/Clear 操作
+- 新增 NewStorageWithCache 工厂方法
+- 新增单元测试 (2个测试用例)
 - 所有测试通过 ✅
 
 ### Iter 47 完成 ✅ (2026-02-21 21:15)
