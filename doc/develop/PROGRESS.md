@@ -1,6 +1,34 @@
 # Open-Think-Reflex Progress Tracker
 
-> **Last Updated**: 2026-02-21 17:58
+> **Last Updated**: 2026-02-21 18:05
+
+---
+
+## 🚧 Sprint 5: 性能优化与UI改进 (2026-02-21 18:05)
+
+### 项目状态
+- **版本**: v1.1.0 (开发中)
+- **当前迭代**: Iter 43 ✅ 已完成
+- **阶段**: Phase 6 - 性能优化
+
+### Sprint 5 计划
+| 功能 | 迭代数 | 状态 |
+|------|--------|------|
+| 性能优化 | 8 | 进行中 |
+| UI改进 | 8 | 待开始 |
+
+### Iter 43 完成 ✅
+- SQLite 索引优化
+- 新增索引:
+  - idx_patterns_last_used_at
+  - idx_patterns_updated_at
+  - idx_patterns_project_deleted (复合)
+  - idx_patterns_strength_threshold (复合)
+  - idx_patterns_decay_enabled
+- 查询计划验证通过
+
+### 下一步
+- Iter 44: 批量操作支持
 
 ---
 
