@@ -8,7 +8,7 @@
 
 ### 项目状态
 - **版本**: v1.1.0 (开发中)
-- **当前迭代**: Iter 46 ✅ 已完成
+- **当前迭代**: Iter 47 ✅ 已完成
 - **阶段**: Phase 6 - 性能优化
 
 ### Sprint 5 计划
@@ -16,6 +16,21 @@
 |------|--------|------|
 | 性能优化 | 8 | 进行中 |
 | UI改进 | 8 | 待开始 |
+
+### Iter 47 完成 ✅ (2026-02-21 21:15)
+- 读写锁优化
+- 接口更新: 将 Iter 46 新增方法添加到 contracts.Storage:
+  - GetPatternByTrigger
+  - CountPatterns
+  - GetRecentlyUsedPatterns
+  - SearchPatterns
+  - GetTopPatterns
+- 新增 StorageStats 并发统计结构体:
+  - ReadOps, WriteOps 计数器
+  - ActiveReaders, ActiveWriters 当前活动数
+  - ReadWaitTime, WriteWaitTime 等待时间统计
+- 新增并发测试 (6个测试用例全部通过)
+- 已推送到 GitHub
 
 ### Iter 46 完成 ✅ (2026-02-21 20:04)
 - 查询优化
@@ -63,7 +78,7 @@
 - 单元测试通过 (4个测试)
 
 ### 下一步
-- Iter 47: 缓存优化 / UI改进
+- Iter 48: 性能基准测试
 
 ---
 
