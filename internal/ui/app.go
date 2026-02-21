@@ -26,6 +26,8 @@ type App struct {
 	output       *OutputView
 	input        *InputView
 	statusBar    *StatusBar
+	helpPanel    *HelpPanel
+	shortcutBar  *ShortcutBar
 	
 	// State
 	currentSpace *models.Space
@@ -111,17 +113,25 @@ func (a *App) setupPages() {
 	a.statusBar = NewStatusBar(a.theme)
 	a.statusBar.SetPatternCount(len(a.patterns))
 	
+	// Create help panel and shortcut bar
+	a.helpPanel = NewHelpPanel(a.theme)
+	a.shortcutBar = NewShortcutBar(a.theme)
+	
 	// Create the main layout
 	flex := tview.NewFlex().
 		SetDirection(tview.FlexRow).
 		AddItem(a.createHeader(), 3, 0, false).
 		AddItem(a.createMainContent(), 0, 1, true).
 		AddItem(a.createInputArea(), 5, 0, false).
+		AddItem(a.shortcutBar.View(), 1, 0, false).
 		AddItem(a.statusBar.View(), 1, 0, false)
 	
 	// Create pages
 	a.pages = tview.NewPages()
 	a.pages.AddPage("main", flex, true, true)
+	
+	// Add help as overlay page
+	a.pages.AddPage("help", a.helpPanel.View(), false, false)
 }
 
 func (a *App) createHeader() tview.Primitive {
@@ -198,10 +208,12 @@ func (a *App) setupKeyBindings() {
 				a.mode = ModeNavigation
 				a.thoughtChain.SetFocused(true)
 				a.app.SetFocus(a.thoughtChain.view)
+				a.shortcutBar.SetMode(ModeNavigation)
 			} else {
 				a.mode = ModeInput
 				a.thoughtChain.SetFocused(false)
 				a.app.SetFocus(a.input.view)
+				a.shortcutBar.SetMode(ModeInput)
 			}
 			return nil
 		}
@@ -391,6 +403,8 @@ func (a *App) toggleTheme() {
 	a.output.theme = a.theme
 	a.input.theme = a.theme
 	a.statusBar.SetTheme(a.theme)
+	a.helpPanel.SetTheme(a.theme)
+	a.shortcutBar.SetTheme(a.theme)
 	
 	// Re-render
 	a.thoughtChain.render()
@@ -405,47 +419,14 @@ func (a *App) toggleTheme() {
 }
 
 func (a *App) showHelp() {
-	helpText := `
-Keyboard Shortcuts
-════════════════════════════════════════════════════════════
-
-[Tab]       Switch between Input and Navigation mode
-[↑/↓]       Navigate thought branches (in Navigation mode)
-[←]         Collapse branch / Go back
-[→]         Expand branch / Select
-[Enter]     Use selected response
-[Space]     Toggle selection
-[t]         Toggle Light/Dark theme
-[h/?]       Show this help
-[q/Esc]     Quit
-
-Vim-style Shortcuts (Navigation mode)
-════════════════════════════════════════════════════════════
-
-[k]         Move up
-[j]         Move down
-[h]         Collapse / Go back
-[l]         Expand / Select
-[Esc]       Return to input mode
-
-Modes
-════════════════════════════════════════════════════════════
-
-INPUT:       Type queries in the input area
-NAVIGATE:    Use arrow keys to browse results
-
-Layers
-════════════════════════════════════════════════════════════
-
-Left Panel:   Thought Chain Tree - Shows AI reasoning branches
-Middle Panel: Output Content - Shows generated responses
-Bottom:      Input Area - Type your queries here
-`
-	a.app.SetRoot(tview.NewModal().
-		SetText(helpText).
-		AddButtons([]string{"Close"}).
-		SetDoneFunc(func(buttonIndex int, buttonLabel string) {
-			a.pages.SwitchToPage("main")
-			a.app.SetRoot(a.pages, true)
-		}), true)
+	// Toggle help panel
+	if a.helpPanel.IsVisible() {
+		a.helpPanel.Hide()
+		a.pages.HidePage("help")
+		a.pages.SwitchToPage("main")
+	} else {
+		a.helpPanel.Show()
+		a.pages.ShowPage("help")
+		a.pages.SwitchToPage("help")
+	}
 }
