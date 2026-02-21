@@ -164,3 +164,123 @@ func TestCache_EmptyLen(t *testing.T) {
 		t.Errorf("expected length 0, got %d", c.Len())
 	}
 }
+
+func TestCache_Stats(t *testing.T) {
+	c := New(10, time.Minute)
+	
+	// Initial stats should be zero
+	hits, misses, ratio := c.Stats()
+	if hits != 0 || misses != 0 || ratio != 0 {
+		t.Errorf("expected zero stats, got hits=%d, misses=%d, ratio=%f", hits, misses, ratio)
+	}
+	
+	// Add some hits
+	c.Set("key1", "value1")
+	c.Get("key1") // hit
+	c.Get("key1") // hit
+	
+	// Add a miss
+	c.Get("nonexistent")
+	
+	hits, misses, ratio = c.Stats()
+	if hits != 2 {
+		t.Errorf("expected 2 hits, got %d", hits)
+	}
+	if misses != 1 {
+		t.Errorf("expected 1 miss, got %d", misses)
+	}
+	if ratio != 0.6666666666666666 {
+		t.Errorf("expected ratio ~0.67, got %f", ratio)
+	}
+}
+
+func TestCache_ResetStats(t *testing.T) {
+	c := New(10, time.Minute)
+	
+	c.Set("key1", "value1")
+	c.Get("key1")
+	
+	c.ResetStats()
+	
+	hits, misses, _ := c.Stats()
+	if hits != 0 || misses != 0 {
+		t.Errorf("expected zero stats after reset, got hits=%d, misses=%d", hits, misses)
+	}
+}
+
+func TestCache_GetOrSet(t *testing.T) {
+	c := New(10, time.Minute)
+	
+	// First call should compute and store
+	computeCount := 0
+	result := c.GetOrSet("key1", func() interface{} {
+		computeCount++
+		return "computed_value"
+	})
+	
+	if result != "computed_value" {
+		t.Errorf("expected computed_value, got %v", result)
+	}
+	if computeCount != 1 {
+		t.Errorf("expected computeCount 1, got %d", computeCount)
+	}
+	
+	// Second call should use cached value
+	result = c.GetOrSet("key1", func() interface{} {
+		computeCount++
+		return "different_value"
+	})
+	
+	if result != "computed_value" {
+		t.Errorf("expected cached value, got %v", result)
+	}
+	if computeCount != 1 {
+		t.Errorf("expected computeCount still 1, got %d", computeCount)
+	}
+}
+
+func TestCache_SetCapacity(t *testing.T) {
+	c := New(10, time.Minute)
+	
+	c.Set("key1", "value1")
+	c.Set("key2", "value2")
+	c.Set("key3", "value3")
+	
+	// Reduce capacity to 2
+	c.SetCapacity(2)
+	
+	if c.Len() != 2 {
+		t.Errorf("expected length 2, got %d", c.Len())
+	}
+}
+
+func TestCache_SetTTL(t *testing.T) {
+	c := New(10, time.Minute)
+	
+	c.SetTTL(time.Hour)
+	
+	c.mu.RLock()
+	ttl := c.ttl
+	c.mu.RUnlock()
+	
+	if ttl != time.Hour {
+		t.Errorf("expected TTL 1h, got %v", ttl)
+	}
+}
+
+func TestCache_Cleanup(t *testing.T) {
+	c := New(10, time.Millisecond)
+	
+	c.Set("key1", "value1")
+	c.Set("key2", "value2")
+	
+	// Wait for expiration
+	time.Sleep(10 * time.Millisecond)
+	
+	// Cleanup
+	c.Cleanup()
+	
+	if c.Len() != 0 {
+		t.Errorf("expected length 0 after cleanup, got %d", c.Len())
+	}
+}
