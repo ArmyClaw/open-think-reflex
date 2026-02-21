@@ -33,6 +33,21 @@ type Storage interface {
 	// Returns ErrNotFound if no pattern exists with the given ID.
 	UpdatePattern(ctx context.Context, p *models.Pattern) error
 
+	// ==================== Batch Operations (Iter 44) ====================
+
+	// SavePatternsBatch saves multiple patterns in a single transaction.
+	// More efficient than calling SavePattern multiple times.
+	// Returns error if any pattern fails validation.
+	SavePatternsBatch(ctx context.Context, patterns []*models.Pattern) error
+
+	// DeletePatternsBatch deletes multiple patterns by their IDs.
+	// Returns error if any deletion fails.
+	DeletePatternsBatch(ctx context.Context, ids []string) error
+
+	// UpdatePatternsBatch updates multiple patterns in a single transaction.
+	// More efficient than calling UpdatePattern multiple times.
+	UpdatePatternsBatch(ctx context.Context, patterns []*models.Pattern) error
+
 	// ==================== Space Operations ====================
 
 	// CreateSpace creates a new space for organizing patterns.

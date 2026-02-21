@@ -274,6 +274,140 @@ func (s *Storage) Close() error {
 	return s.db.Close()
 }
 
+// SavePatternsBatch saves multiple patterns in a single transaction (Iter 44)
+// This is more efficient than calling SavePattern multiple times.
+func (s *Storage) SavePatternsBatch(ctx context.Context, patterns []*models.Pattern) error {
+	if len(patterns) == 0 {
+		return nil
+	}
+
+	// Validate all patterns first
+	for _, p := range patterns {
+		if err := p.Validate(); err != nil {
+			return fmt.Errorf("validation failed for pattern %s: %w", p.ID, err)
+		}
+	}
+
+	// Use transaction for atomicity
+	tx, err := s.db.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT OR REPLACE INTO patterns (
+			id, trigger, response, strength, threshold, decay_rate, decay_enabled,
+			connections, created_at, updated_at, reinforcement_count, decay_count,
+			last_used_at, tags, project, user_id, deleted_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	now := time.Now()
+	for _, p := range patterns {
+		connections, _ := json.Marshal(p.Connections)
+		tags, _ := json.Marshal(p.Tags)
+
+		if p.CreatedAt.IsZero() {
+			p.CreatedAt = now
+		}
+		p.UpdatedAt = now
+
+		_, err := stmt.ExecContext(ctx,
+			p.ID, p.Trigger, p.Response, p.Strength, p.Threshold, p.DecayRate, p.DecayEnabled,
+			string(connections), p.CreatedAt.Unix(), p.UpdatedAt.Unix(), p.ReinforceCnt, p.DecayCnt,
+			int64TimeToPtr(p.LastUsedAt), string(tags), p.Project, p.UserID, int64TimeToPtr(p.DeletedAt),
+		)
+		if err != nil {
+			return fmt.Errorf("failed to insert pattern %s: %w", p.ID, err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+// DeletePatternsBatch deletes multiple patterns by their IDs (Iter 44)
+func (s *Storage) DeletePatternsBatch(ctx context.Context, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	tx, err := s.db.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, `UPDATE patterns SET deleted_at = ? WHERE id = ?`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	now := time.Now().Unix()
+	for _, id := range ids {
+		_, err := stmt.ExecContext(ctx, now, id)
+		if err != nil {
+			return fmt.Errorf("failed to delete pattern %s: %w", id, err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+// UpdatePatternsBatch updates multiple patterns in a single transaction (Iter 44)
+func (s *Storage) UpdatePatternsBatch(ctx context.Context, patterns []*models.Pattern) error {
+	if len(patterns) == 0 {
+		return nil
+	}
+
+	for _, p := range patterns {
+		if err := p.Validate(); err != nil {
+			return fmt.Errorf("validation failed for pattern %s: %w", p.ID, err)
+		}
+	}
+
+	tx, err := s.db.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, `
+		UPDATE patterns SET trigger = ?, response = ?, strength = ?, threshold = ?,
+			decay_rate = ?, decay_enabled = ?, connections = ?, updated_at = ?,
+			reinforcement_count = ?, decay_count = ?, last_used_at = ?, tags = ?, project = ?
+		WHERE id = ?
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	now := time.Now()
+	for _, p := range patterns {
+		connections, _ := json.Marshal(p.Connections)
+		tags, _ := json.Marshal(p.Tags)
+		p.UpdatedAt = now
+
+		_, err := stmt.ExecContext(ctx,
+			p.Trigger, p.Response, p.Strength, p.Threshold,
+			p.DecayRate, p.DecayEnabled, string(connections), p.UpdatedAt.Unix(),
+			p.ReinforceCnt, p.DecayCnt, int64TimeToPtr(p.LastUsedAt), string(tags), p.Project,
+			p.ID,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to update pattern %s: %w", p.ID, err)
+		}
+	}
+
+	return tx.Commit()
+}
+
 // Helper functions
 func int64TimeToPtr(t *time.Time) *int64 {
 	if t == nil {
