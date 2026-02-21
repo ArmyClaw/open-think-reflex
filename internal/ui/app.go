@@ -28,6 +28,7 @@ type App struct {
 	statusBar    *StatusBar
 	helpPanel    *HelpPanel
 	shortcutBar  *ShortcutBar
+	filterPanel  *FilterPanel
 	
 	// State
 	currentSpace *models.Space
@@ -116,6 +117,10 @@ func (a *App) setupPages() {
 	// Create help panel and shortcut bar
 	a.helpPanel = NewHelpPanel(a.theme)
 	a.shortcutBar = NewShortcutBar(a.theme)
+	a.filterPanel = NewFilterPanel()
+	
+	// Set up filter callback
+	a.filterPanel.onFilter = a.filterPatterns
 	
 	// Create the main layout
 	flex := tview.NewFlex().
@@ -132,6 +137,7 @@ func (a *App) setupPages() {
 	
 	// Add help as overlay page
 	a.pages.AddPage("help", a.helpPanel.View(), false, false)
+	a.pages.AddPage("filter", a.filterPanel.GetView(), false, false)
 }
 
 func (a *App) createHeader() tview.Primitive {
@@ -272,6 +278,10 @@ func (a *App) setupKeyBindings() {
 				return nil
 			case '?':
 				a.showHelp()
+				return nil
+			case '/':
+				// Toggle filter panel
+				a.toggleFilter()
 				return nil
 			case 't':
 				// Toggle theme
@@ -428,5 +438,99 @@ func (a *App) showHelp() {
 		a.helpPanel.Show()
 		a.pages.ShowPage("help")
 		a.pages.SwitchToPage("help")
+	}
+}
+
+// toggleFilter toggles the filter panel visibility
+func (a *App) toggleFilter() {
+	if a.filterPanel.IsVisible() {
+		a.filterPanel.SetVisible(false)
+		a.pages.HidePage("filter")
+		a.pages.SwitchToPage("main")
+	} else {
+		a.filterPanel.SetVisible(true)
+		a.pages.ShowPage("filter")
+		a.pages.SwitchToPage("filter")
+		a.filterPanel.Focus()
+	}
+}
+
+// filterPatterns filters patterns based on query and filter type
+func (a *App) filterPatterns(query string, filterType FilterType) []*models.Pattern {
+	var results []*models.Pattern
+	
+	for _, p := range a.patterns {
+		match := false
+		
+		switch filterType {
+		case FilterAll:
+			match = true
+		case FilterByTrigger:
+			match = containsIgnoreCase(p.Trigger, query)
+		case FilterByResponse:
+			match = containsIgnoreCase(p.Response, query)
+		case FilterByStrength:
+			// Query can be "high", "medium", "low"
+			match = matchesStrength(p.Strength, query)
+		case FilterRecent:
+			// Show all if no query, or match recent used
+			match = query == "" || containsIgnoreCase(p.Trigger, query)
+		case FilterFavorites:
+			// Would need a favorite field
+			match = query == "" || containsIgnoreCase(p.Trigger, query)
+		}
+		
+		if match {
+			results = append(results, p)
+		}
+	}
+	
+	return results
+}
+
+// containsIgnoreCase checks if s contains sub (case insensitive)
+func containsIgnoreCase(s, sub string) bool {
+	if sub == "" {
+		return true
+	}
+	s = lower(s)
+	sub = lower(s)
+	return contains(s, sub)
+}
+
+func lower(s string) string {
+	result := make([]byte, len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		result[i] = c
+	}
+	return string(result)
+}
+
+func contains(s, sub string) bool {
+	for i := 0; i <= len(s)-len(sub); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
+}
+
+func matchesStrength(strength float64, query string) bool {
+	query = lower(query)
+	switch query {
+	case "high", "强", "80":
+		return strength >= 80
+	case "medium", "中", "50":
+		return strength >= 50 && strength < 80
+	case "low", "弱", "20":
+		return strength >= 20 && strength < 50
+	case "very low", "很弱", "0":
+		return strength < 20
+	default:
+		return true
 	}
 }
