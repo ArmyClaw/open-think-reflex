@@ -25,6 +25,7 @@ type App struct {
 	thoughtChain *ThoughtChainView
 	output       *OutputView
 	input        *InputView
+	statusBar    *StatusBar
 	
 	// State
 	currentSpace *models.Space
@@ -106,12 +107,17 @@ func (a *App) loadData(ctx context.Context) error {
 }
 
 func (a *App) setupPages() {
+	// Create status bar
+	a.statusBar = NewStatusBar(a.theme)
+	a.statusBar.SetPatternCount(len(a.patterns))
+	
 	// Create the main layout
 	flex := tview.NewFlex().
 		SetDirection(tview.FlexRow).
 		AddItem(a.createHeader(), 3, 0, false).
 		AddItem(a.createMainContent(), 0, 1, true).
-		AddItem(a.createInputArea(), 5, 0, false)
+		AddItem(a.createInputArea(), 5, 0, false).
+		AddItem(a.statusBar.View(), 1, 0, false)
 	
 	// Create pages
 	a.pages = tview.NewPages()
@@ -322,6 +328,9 @@ func (a *App) useSelectedResponse() {
 func (a *App) handleInput(text string) {
 	ctx := context.Background()
 	
+	// Set status to matching
+	a.statusBar.SetStatus(StatusMatching, "Matching patterns...")
+	
 	// Filter active patterns
 	var activePatterns []*models.Pattern
 	for _, p := range a.patterns {
@@ -333,6 +342,8 @@ func (a *App) handleInput(text string) {
 	if len(activePatterns) == 0 {
 		a.output.SetOutput("No active patterns found (all below threshold)\n\nTip: Use 'otr pattern create' to add patterns")
 		a.thoughtChain.Clear()
+		a.statusBar.SetStatus(StatusIdle, "No active patterns")
+		a.statusBar.SetMatchCount(0)
 		return
 	}
 	
@@ -349,11 +360,17 @@ func (a *App) handleInput(text string) {
 	if len(results) == 0 {
 		a.output.SetOutput(fmt.Sprintf("No matches found for: %s\n\nTip: Use 'otr pattern create' to add patterns", text))
 		a.thoughtChain.Clear()
+		a.statusBar.SetStatus(StatusIdle, "No matches")
+		a.statusBar.SetMatchCount(0)
 		return
 	}
 	
 	// Update thought chain with results
 	a.thoughtChain.SetResults(results)
+	
+	// Update status bar
+	a.statusBar.SetMatchCount(len(results))
+	a.statusBar.SetStatus(StatusIdle, fmt.Sprintf("Found %d match(es)", len(results)))
 	
 	// Update output with first match
 	a.output.SetOutput(fmt.Sprintf("Found %d match(es):\n\n1. %s\n   Confidence: %.0f%% (%s)\n   Response: %s\n\nUse [↑/↓] to navigate, [Enter] to select",
@@ -373,6 +390,7 @@ func (a *App) toggleTheme() {
 	a.thoughtChain.theme = a.theme
 	a.output.theme = a.theme
 	a.input.theme = a.theme
+	a.statusBar.SetTheme(a.theme)
 	
 	// Re-render
 	a.thoughtChain.render()
