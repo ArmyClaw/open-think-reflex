@@ -44,9 +44,13 @@ type AppConfig struct {
 
 // StorageConfig contains storage backend settings.
 type StorageConfig struct {
-	Type      string `mapstructure:"type"`       // Storage type (sqlite, etc.)
-	Path      string `mapstructure:"path"`       // Database file path
-	CacheSize int    `mapstructure:"cache_size"` // LRU cache capacity
+	Type            string `mapstructure:"type"`             // Storage type (sqlite, etc.)
+	Path            string `mapstructure:"path"`             // Database file path
+	CacheSize       int    `mapstructure:"cache_size"`       // LRU cache capacity
+	MaxOpenConns    int    `mapstructure:"max_open_conns"`   // Max open connections
+	MaxIdleConns    int    `mapstructure:"max_idle_conns"`   // Max idle connections
+	ConnMaxLifetime int    `mapstructure:"conn_max_lifetime"` // Connection max lifetime (seconds)
+	ConnMaxIdleTime int    `mapstructure:"conn_max_idle_time"` // Connection max idle time (seconds)
 }
 
 // AIConfig contains AI provider configuration.
@@ -214,6 +218,10 @@ func (l *Loader) setDefaults() {
 	l.v.SetDefault("storage.type", "sqlite")
 	l.v.SetDefault("storage.path", "$HOME/.openclaw/reflex/data.db")
 	l.v.SetDefault("storage.cache_size", 1000)
+	l.v.SetDefault("storage.max_open_conns", 1)   // SQLite single-writer model
+	l.v.SetDefault("storage.max_idle_conns", 1)
+	l.v.SetDefault("storage.conn_max_lifetime", 3600)  // 1 hour
+	l.v.SetDefault("storage.conn_max_idle_time", 300)  // 5 minutes
 
 	// AI defaults
 	l.v.SetDefault("ai.provider", "anthropic")

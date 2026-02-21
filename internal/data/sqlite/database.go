@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/ArmyClaw/open-think-reflex/pkg/models"
 	_ "github.com/mattn/go-sqlite3"
@@ -17,8 +18,31 @@ type Database struct {
 	path   string
 }
 
-// NewDatabase creates a new database connection
+// DatabaseConfig holds connection pool configuration
+type DatabaseConfig struct {
+	MaxOpenConns    int
+	MaxIdleConns    int
+	ConnMaxLifetime time.Duration
+	ConnMaxIdleTime time.Duration
+}
+
+// DefaultDatabaseConfig returns default connection pool settings
+func DefaultDatabaseConfig() DatabaseConfig {
+	return DatabaseConfig{
+		MaxOpenConns:    1,  // SQLite single-writer model
+		MaxIdleConns:    1,
+		ConnMaxLifetime: time.Hour,
+		ConnMaxIdleTime: 5 * time.Minute,
+	}
+}
+
+// NewDatabase creates a new database connection with default settings
 func NewDatabase(path string) (*Database, error) {
+	return NewDatabaseWithConfig(path, DefaultDatabaseConfig())
+}
+
+// NewDatabaseWithConfig creates a new database connection with custom config
+func NewDatabaseWithConfig(path string, config DatabaseConfig) (*Database, error) {
 	// Ensure directory exists
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -31,9 +55,19 @@ func NewDatabase(path string) (*Database, error) {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	// Configure connection
-	db.SetMaxOpenConns(1) // SQLite single-writer model
-	db.SetMaxIdleConns(1)
+	// Configure connection pool
+	if config.MaxOpenConns > 0 {
+		db.SetMaxOpenConns(config.MaxOpenConns)
+	}
+	if config.MaxIdleConns > 0 {
+		db.SetMaxIdleConns(config.MaxIdleConns)
+	}
+	if config.ConnMaxLifetime > 0 {
+		db.SetConnMaxLifetime(config.ConnMaxLifetime)
+	}
+	if config.ConnMaxIdleTime > 0 {
+		db.SetConnMaxIdleTime(config.ConnMaxIdleTime)
+	}
 
 	// Verify connection
 	if err := db.Ping(); err != nil {
@@ -54,6 +88,27 @@ func (d *Database) Close() error {
 // DB returns the underlying sql.DB
 func (d *Database) DB() *sql.DB {
 	return d.db
+}
+
+// PoolStats returns current connection pool statistics
+func (d *Database) PoolStats() *sql.DBStats {
+	stats := d.db.Stats()
+	return &stats
+}
+
+// Ping checks database connectivity
+func (d *Database) Ping(ctx context.Context) error {
+	return d.db.PingContext(ctx)
+}
+
+// IsHealthy checks if the database connection is healthy
+func (d *Database) IsHealthy(ctx context.Context) bool {
+	if err := d.db.PingContext(ctx); err != nil {
+		return false
+	}
+	stats := d.db.Stats()
+	// Consider unhealthy if too many connections are in use
+	return stats.InUse < stats.MaxOpenConnections
 }
 
 // Migrate runs database migrations
