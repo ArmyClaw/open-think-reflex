@@ -1,3 +1,5 @@
+// Package config provides configuration loading and management for Open-Think-Reflex.
+// Supports YAML configuration files with environment variable overrides.
 package config
 
 import (
@@ -8,16 +10,6 @@ import (
 
 	"github.com/spf13/viper"
 )
-
-// Package config provides configuration loading and management for Open-Think-Reflex.
-// Supports YAML configuration files with environment variable overrides.
-package config
-
-import (
-	"fmt"
-	"os"
-	"strings"
-	"time"
 
 	"github.com/spf13/viper"
 )
@@ -93,12 +85,6 @@ type OpenAIConfig struct {
 	Model       string  `mapstructure:"model"`         // Default model
 	MaxTokens   int     `mapstructure:"max_tokens"`    // Max tokens per request
 	Temperature float64 `mapstructure:"temperature"`    // Temperature (0.0-1.0)
-}
-
-// LocalConfig contains settings for local AI models (Ollama, LM Studio, etc.).
-type LocalConfig struct {
-	APIURL string `mapstructure:"api_url"` // Local server URL (e.g., http://localhost:11434)
-	Model  string `mapstructure:"model"`   // Model name
 }
 
 // LocalConfig contains settings for local AI models (Ollama, LM Studio, etc.).

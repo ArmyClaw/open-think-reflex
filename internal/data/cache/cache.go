@@ -126,3 +126,120 @@ func (c *Cache) GetOrSet(key string, compute func() interface{}) interface{} {
 
 	return value
 }
+
+// evictOldest removes the least recently used item from the cache.
+// Must be called with write lock held.
+func (c *Cache) evictOldest() {
+	var oldestKey string
+	var oldestTime time.Time
+	first := true
+
+	for key, item := range c.items {
+		if first || item.accessTime.Before(oldestTime) {
+			oldestKey = key
+			oldestTime = item.accessTime
+			first = false
+		}
+	}
+
+	if oldestKey != "" {
+		delete(c.items, oldestKey)
+	}
+}
+
+// Delete removes a specific key from the cache.
+func (c *Cache) Delete(key string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.items, key)
+}
+
+// Clear removes all items from the cache.
+func (c *Cache) Clear() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.items = make(map[string]*cacheItem)
+	c.hits = 0
+	c.misses = 0
+}
+
+// Len returns the number of items in the cache.
+func (c *Cache) Len() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return len(c.items)
+}
+
+// Stats returns cache hit/miss statistics.
+type Stats struct {
+	Hits   int64
+	Misses int64
+	Ratio  float64
+}
+
+// Stats returns the current cache statistics.
+func (c *Cache) Stats() Stats {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	var ratio float64
+	if c.hits+c.misses > 0 {
+		ratio = float64(c.hits) / float64(c.hits+c.misses)
+	}
+
+	return Stats{
+		Hits:   c.hits,
+		Misses: c.misses,
+		Ratio:  ratio,
+	}
+}
+
+// ResetStats resets hit and miss counters to zero.
+func (c *Cache) ResetStats() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.hits = 0
+	c.misses = 0
+}
+
+// SetCapacity changes the cache capacity.
+// If the new capacity is smaller, evicts oldest items.
+func (c *Cache) SetCapacity(capacity int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.capacity = capacity
+	for len(c.items) > capacity {
+		c.evictOldest()
+	}
+}
+
+// SetTTL changes the TTL for new items.
+func (c *Cache) SetTTL(ttl time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.ttl = ttl
+}
+
+// Cleanup removes all expired items from the cache.
+func (c *Cache) Cleanup() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	now := time.Now()
+	for key, item := range c.items {
+		if now.After(item.expiration) {
+			delete(c.items, key)
+		}
+	}
+}
+
+// StartCleanupTask starts a background goroutine that periodically cleans up expired items.
+func (c *Cache) StartCleanupTask(interval time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		for range ticker.C {
+			c.Cleanup()
+		}
+	}()
+}
