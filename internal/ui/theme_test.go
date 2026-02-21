@@ -2,6 +2,8 @@ package ui
 
 import (
 	"testing"
+
+	"github.com/gdamore/tcell/v2"
 )
 
 func TestDefaultTheme(t *testing.T) {
@@ -10,77 +12,71 @@ func TestDefaultTheme(t *testing.T) {
 		t.Fatal("DefaultTheme should not return nil")
 	}
 
-	// Check essential colors are set
-	if theme.Primary == "" {
-		t.Error("Primary color should be set")
+	// Check essential colors are set (not black/white defaults)
+	if theme.Primary == tcell.ColorBlack {
+		t.Error("Primary color should not be black")
 	}
-	if theme.Background == "" {
-		t.Error("Background color should be set")
+	if theme.Background == tcell.ColorWhite {
+		t.Error("Background color should not be white (for dark theme)")
 	}
-	if theme.Text == "" {
-		t.Error("Text color should be set")
+	if theme.Text == tcell.ColorBlack {
+		t.Error("Text color should not be black (for dark theme)")
 	}
 }
 
-func TestThemeManager_Current(t *testing.T) {
-	manager := NewThemeManager()
-	if manager == nil {
-		t.Fatal("NewThemeManager should not return nil")
-	}
-
-	theme := manager.Current()
+func TestLightTheme(t *testing.T) {
+	theme := LightTheme()
 	if theme == nil {
-		t.Fatal("Current should not return nil")
+		t.Fatal("LightTheme should not return nil")
+	}
+
+	if theme.Name != "light" {
+		t.Errorf("Expected name 'light', got '%s'", theme.Name)
 	}
 }
 
-func TestThemeManager_Switch(t *testing.T) {
-	manager := NewThemeManager()
+func TestGetTheme(t *testing.T) {
+	// Test dark theme
+	dark := GetTheme("dark")
+	if dark == nil || dark.Name != "dark" {
+		t.Error("GetTheme(dark) should return dark theme")
+	}
 
-	// Get initial theme
-	initial := manager.Current().Name
+	// Test light theme
+	light := GetTheme("light")
+	if light == nil || light.Name != "light" {
+		t.Error("GetTheme(light) should return light theme")
+	}
 
-	// Switch theme
-	manager.Switch()
-
-	// Theme should be different
-	after := manager.Current().Name
-	if initial == after {
-		t.Logf("Theme switched from %s to %s", initial, after)
+	// Test unknown theme (should return dark)
+	unknown := GetTheme("unknown")
+	if unknown == nil || unknown.Name != "dark" {
+		t.Error("GetTheme(unknown) should return dark theme as default")
 	}
 }
 
-func TestThemeManager_SetTheme(t *testing.T) {
-	manager := NewThemeManager()
-
-	// Set dark theme
-	err := manager.SetTheme("dark")
-	if err != nil {
-		t.Errorf("SetTheme(dark) failed: %v", err)
+func TestAvailableThemes(t *testing.T) {
+	themes := AvailableThemes()
+	if len(themes) != 2 {
+		t.Errorf("Expected 2 themes, got %d", len(themes))
 	}
 
-	// Set light theme
-	err = manager.SetTheme("light")
-	if err != nil {
-		t.Errorf("SetTheme(light) failed: %v", err)
+	// Check both themes are present
+	foundDark := false
+	foundLight := false
+	for _, t := range themes {
+		if t == "dark" {
+			foundDark = true
+		}
+		if t == "light" {
+			foundLight = true
+		}
 	}
 
-	// Set invalid theme
-	err = manager.SetTheme("invalid-theme")
-	if err == nil {
-		t.Error("Expected error for invalid theme")
+	if !foundDark {
+		t.Error("dark theme should be available")
 	}
-}
-
-func TestTheme_IsDark(t *testing.T) {
-	dark := &Theme{Name: "dark"}
-	light := &Theme{Name: "light"}
-
-	if !dark.IsDark() {
-		t.Error("dark theme should return true for IsDark()")
-	}
-
-	if light.IsDark() {
-		t.Error("light theme should return false for IsDark()")
+	if !foundLight {
+		t.Error("light theme should be available")
 	}
 }

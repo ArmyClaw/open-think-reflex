@@ -167,30 +167,30 @@ func TestCache_EmptyLen(t *testing.T) {
 
 func TestCache_Stats(t *testing.T) {
 	c := New(10, time.Minute)
-	
+
 	// Initial stats should be zero
-	hits, misses, ratio := c.Stats()
-	if hits != 0 || misses != 0 || ratio != 0 {
-		t.Errorf("expected zero stats, got hits=%d, misses=%d, ratio=%f", hits, misses, ratio)
+	stats := c.Stats()
+	if stats.Hits != 0 || stats.Misses != 0 || stats.Ratio != 0 {
+		t.Errorf("expected zero stats, got hits=%d, misses=%d, ratio=%f", stats.Hits, stats.Misses, stats.Ratio)
 	}
-	
+
 	// Add some hits
 	c.Set("key1", "value1")
 	c.Get("key1") // hit
 	c.Get("key1") // hit
-	
+
 	// Add a miss
 	c.Get("nonexistent")
-	
-	hits, misses, ratio = c.Stats()
-	if hits != 2 {
-		t.Errorf("expected 2 hits, got %d", hits)
+
+	stats = c.Stats()
+	if stats.Hits != 2 {
+		t.Errorf("expected 2 hits, got %d", stats.Hits)
 	}
-	if misses != 1 {
-		t.Errorf("expected 1 miss, got %d", misses)
+	if stats.Misses != 1 {
+		t.Errorf("expected 1 miss, got %d", stats.Misses)
 	}
-	if ratio != 0.6666666666666666 {
-		t.Errorf("expected ratio ~0.67, got %f", ratio)
+	if stats.Ratio != 0.6666666666666666 {
+		t.Errorf("expected ratio ~0.67, got %f", stats.Ratio)
 	}
 }
 
@@ -201,10 +201,10 @@ func TestCache_ResetStats(t *testing.T) {
 	c.Get("key1")
 	
 	c.ResetStats()
-	
-	hits, misses, _ := c.Stats()
-	if hits != 0 || misses != 0 {
-		t.Errorf("expected zero stats after reset, got hits=%d, misses=%d", hits, misses)
+
+	stats := c.Stats()
+	if stats.Hits != 0 || stats.Misses != 0 {
+		t.Errorf("expected zero stats after reset, got hits=%d, misses=%d", stats.Hits, stats.Misses)
 	}
 }
 

@@ -225,7 +225,7 @@ func listSpaces(storage *sqlite.Storage) error {
 func createSpace(storage *sqlite.Storage, name, description string) error {
 	ctx := context.Background()
 	space := &models.Space{
-		ID:          models.NewSpaceID(),
+		ID:          generateSpaceID(),
 		Name:        name,
 		Description: description,
 		CreatedAt:   time.Now(),
@@ -238,4 +238,9 @@ func createSpace(storage *sqlite.Storage, name, description string) error {
 
 	fmt.Printf("Space created: %s\n", space.ID)
 	return nil
+}
+
+// generateSpaceID generates a new space ID.
+func generateSpaceID() string {
+	return fmt.Sprintf("space-%d", time.Now().UnixNano())
 }

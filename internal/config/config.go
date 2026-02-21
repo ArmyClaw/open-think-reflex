@@ -11,9 +11,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-	"github.com/spf13/viper"
-)
-
 // Config represents the top-level application configuration.
 // All settings can be overridden via environment variables (e.g., OTR_AI_PROVIDER).
 type Config struct {

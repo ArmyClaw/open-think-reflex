@@ -8,18 +8,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// Package models defines the core data structures for Open-Think-Reflex.
-// These models represent patterns, spaces, and related domain concepts.
-package models
-
-import (
-	"fmt"
-	"strings"
-	"time"
-
-	"github.com/google/uuid"
-)
-
 // Pattern represents a reflex pattern that maps triggers to AI responses.
 // Patterns form the basis of the reflex system - they are matched against
 // user input and used to generate quick responses.
