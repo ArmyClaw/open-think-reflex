@@ -29,12 +29,14 @@ type App struct {
 	helpPanel    *HelpPanel
 	shortcutBar  *ShortcutBar
 	filterPanel  *FilterPanel
+	statsPanel   *StatsPanel
 	
 	// State
 	currentSpace *models.Space
 	patterns     []*models.Pattern
 	results      []contracts.MatchResult
 	mode         AppMode // input, navigation
+	showStats    bool
 }
 
 // AppMode represents the current interaction mode
@@ -118,6 +120,8 @@ func (a *App) setupPages() {
 	a.helpPanel = NewHelpPanel(a.theme)
 	a.shortcutBar = NewShortcutBar(a.theme)
 	a.filterPanel = NewFilterPanel()
+	a.statsPanel = NewStatsPanel()
+	a.showStats = false
 	
 	// Set up filter callback
 	a.filterPanel.onFilter = a.filterPatterns
@@ -138,6 +142,7 @@ func (a *App) setupPages() {
 	// Add help as overlay page
 	a.pages.AddPage("help", a.helpPanel.View(), false, false)
 	a.pages.AddPage("filter", a.filterPanel.GetView(), false, false)
+	a.pages.AddPage("stats", a.statsPanel.GetView(), false, false)
 }
 
 func (a *App) createHeader() tview.Primitive {
@@ -286,6 +291,10 @@ func (a *App) setupKeyBindings() {
 			case 't':
 				// Toggle theme
 				a.toggleTheme()
+				return nil
+			case 's':
+				// Toggle stats panel
+				a.toggleStats()
 				return nil
 			case 'h':
 				// Left arrow equivalent
@@ -452,6 +461,29 @@ func (a *App) toggleFilter() {
 		a.pages.ShowPage("filter")
 		a.pages.SwitchToPage("filter")
 		a.filterPanel.Focus()
+	}
+}
+
+// toggleStats toggles the statistics panel visibility
+func (a *App) toggleStats() {
+	if a.showStats {
+		a.showStats = false
+		a.statsPanel.SetVisible(false)
+		a.pages.HidePage("stats")
+		a.pages.SwitchToPage("main")
+		a.app.SetFocus(a.input.view)
+	} else {
+		// Update stats with current patterns
+		var patternModels []models.Pattern
+		for _, p := range a.patterns {
+			patternModels = append(patternModels, *p)
+		}
+		a.statsPanel.SetPatterns(patternModels)
+		
+		a.showStats = true
+		a.statsPanel.SetVisible(true)
+		a.pages.ShowPage("stats")
+		a.pages.SwitchToPage("stats")
 	}
 }
 

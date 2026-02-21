@@ -49,6 +49,8 @@ func (h *HelpPanel) getHelpContent() string {
 │  [Enter]     Use selected response                              │
 │  [Space]     Toggle selection                                   │
 │  [t]         Toggle Light/Dark theme                            │
+│  [/]         Toggle Filter panel                                │
+│  [s]         Toggle Statistics panel                            │
 │  [h/?]       Show/Hide this help                                │
 │  [q/Esc]     Quit application                                   │
 ├─────────────────────────────────────────────────────────────────┤
@@ -133,9 +135,9 @@ func (s *ShortcutBar) createView() *tview.TextView {
 
 func (s *ShortcutBar) getShortcuts(mode AppMode) string {
 	if mode == ModeNavigation {
-		return " [↑/↓] Navigate | [Enter] Select | [←/→] Expand/Collapse | [Tab] Switch Mode | [?] Help | [q] Quit "
+		return " [↑/↓] Navigate | [Enter] Select | [←/→] Expand/Collapse | [Tab] Switch | [/] Filter | [s] Stats | [?] Help | [q] Quit "
 	}
-	return " [Tab] Switch to Results | [t] Theme | [?] Help | [q] Quit "
+	return " [Tab] Switch | [t] Theme | [/] Filter | [s] Stats | [?] Help | [q] Quit "
 }
 
 // View returns the underlying tview primitive
