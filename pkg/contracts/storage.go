@@ -33,6 +33,26 @@ type Storage interface {
 	// Returns ErrNotFound if no pattern exists with the given ID.
 	UpdatePattern(ctx context.Context, p *models.Pattern) error
 
+	// ==================== Query Optimization Methods (Iter 46) ====================
+
+	// GetPatternByTrigger retrieves a pattern by its trigger (exact match).
+	// Uses cached statement for better performance.
+	GetPatternByTrigger(ctx context.Context, trigger string) (*models.Pattern, error)
+
+	// CountPatterns returns the total count of patterns matching filters.
+	// More efficient than len(ListPatterns(...)).
+	CountPatterns(ctx context.Context, opts ListOptions) (int, error)
+
+	// GetRecentlyUsedPatterns retrieves patterns ordered by last_used_at.
+	// Useful for "frequently used" features.
+	GetRecentlyUsedPatterns(ctx context.Context, limit int) ([]*models.Pattern, error)
+
+	// SearchPatterns performs a full-text search on trigger and response.
+	SearchPatterns(ctx context.Context, query string, opts ListOptions) ([]*models.Pattern, error)
+
+	// GetTopPatterns retrieves the strongest patterns (for matching priority).
+	GetTopPatterns(ctx context.Context, limit int) ([]*models.Pattern, error)
+
 	// ==================== Batch Operations (Iter 44) ====================
 
 	// SavePatternsBatch saves multiple patterns in a single transaction.

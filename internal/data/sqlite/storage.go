@@ -17,6 +17,19 @@ type Storage struct {
 	db        *Database
 	stmtCache map[string]*sql.Stmt
 	mu        sync.RWMutex
+
+	// Concurrency statistics (Iter 47)
+	stats StorageStats
+}
+
+// StorageStats holds concurrency statistics for monitoring
+type StorageStats struct {
+	ReadOps        int64 // Total read operations
+	WriteOps       int64 // Total write operations
+	ActiveReaders  int64 // Current active read operations
+	ActiveWriters  int64 // Current active write operations
+	ReadWaitTime   int64 // Nanoseconds spent waiting for read locks
+	WriteWaitTime  int64 // Nanoseconds spent waiting for write locks
 }
 
 // NewStorage creates a new SQLite storage
@@ -657,7 +670,21 @@ func int64ToTimePtr(i sql.NullInt64) *time.Time {
 	return &t
 }
 
+// ==================== Concurrency Statistics (Iter 47) ====================
 
+// Stats returns the current storage concurrency statistics
+func (s *Storage) Stats() StorageStats {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.stats
+}
+
+// ResetStats resets the concurrency statistics counters
+func (s *Storage) ResetStats() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stats = StorageStats{}
+}
 
 // transaction implements contracts.Transaction
 type transaction struct {
