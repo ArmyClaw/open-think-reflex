@@ -11,6 +11,7 @@ import (
 	"github.com/ArmyClaw/open-think-reflex/internal/data/sqlite"
 	"github.com/ArmyClaw/open-think-reflex/internal/ui"
 	"github.com/ArmyClaw/open-think-reflex/pkg/contracts"
+	"github.com/ArmyClaw/open-think-reflex/pkg/export"
 	"github.com/ArmyClaw/open-think-reflex/pkg/models"
 	"github.com/urfave/cli/v2"
 )
@@ -228,6 +229,42 @@ func buildCommands(storage *sqlite.Storage) []*cli.Command {
 			},
 			Action: func(c *cli.Context) error {
 				return runQuery(storage, c.String("query"), c.Float64("threshold"))
+			},
+		},
+		{
+			Name:  "export",
+			Usage: "Export patterns to a JSON file",
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:     "output",
+					Required: true,
+					Usage:    "Output file path",
+				},
+				&cli.StringFlag{
+					Name:  "project",
+					Usage: "Filter by project name",
+				},
+			},
+			Action: func(c *cli.Context) error {
+				return exportPatterns(storage, c.String("output"), c.String("project"))
+			},
+		},
+		{
+			Name:  "import",
+			Usage: "Import patterns from a JSON file",
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:     "input",
+					Required: true,
+					Usage:    "Input file path",
+				},
+				&cli.BoolFlag{
+					Name:  "force",
+					Usage: "Overwrite existing patterns with same ID",
+				},
+			},
+			Action: func(c *cli.Context) error {
+				return importPatterns(storage, c.String("input"), c.Bool("force"))
 			},
 		},
 	}
@@ -484,4 +521,83 @@ func truncate(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
+}
+
+// exportPatterns exports patterns to a JSON file.
+func exportPatterns(storage *sqlite.Storage, outputPath, projectFilter string) error {
+	ctx := context.Background()
+
+	var patterns []*models.Pattern
+	var err error
+
+	if projectFilter != "" {
+		// Filter by project
+		allPatterns, err := storage.ListPatterns(ctx, contracts.ListOptions{Limit: 10000})
+		if err != nil {
+			return fmt.Errorf("failed to list patterns: %w", err)
+		}
+		for _, p := range allPatterns {
+			if p.Project == projectFilter {
+				patterns = append(patterns, p)
+			}
+		}
+	} else {
+		// Export all
+		patterns, err = storage.ListPatterns(ctx, contracts.ListOptions{Limit: 10000})
+		if err != nil {
+			return fmt.Errorf("failed to list patterns: %w", err)
+		}
+	}
+
+	exporter := export.NewExporter()
+	if err := exporter.ExportToJSON(ctx, patterns, outputPath); err != nil {
+		return fmt.Errorf("failed to export: %w", err)
+	}
+
+	fmt.Printf("Exported %d patterns to %s\n", len(patterns), outputPath)
+	return nil
+}
+
+// importPatterns imports patterns from a JSON file.
+func importPatterns(storage *sqlite.Storage, inputPath string, force bool) error {
+	ctx := context.Background()
+
+	importer := export.NewImporter()
+	importData, err := importer.ImportFromJSON(ctx, inputPath)
+	if err != nil {
+		return fmt.Errorf("failed to import: %w", err)
+	}
+
+	imported := 0
+	skipped := 0
+
+	for _, p := range importData.Patterns {
+		// Check if pattern already exists
+		existing, err := storage.GetPattern(ctx, p.ID)
+		if err == nil && existing != nil {
+			if force {
+				// Update existing pattern
+				if err := storage.SavePattern(ctx, &p); err != nil {
+					return fmt.Errorf("failed to update pattern %s: %w", p.ID, err)
+				}
+				imported++
+			} else {
+				fmt.Printf("Skipping existing pattern: %s (use --force to overwrite)\n", p.ID)
+				skipped++
+			}
+			continue
+		}
+
+		// Create new pattern
+		if err := storage.SavePattern(ctx, &p); err != nil {
+			return fmt.Errorf("failed to save pattern %s: %w", p.ID, err)
+		}
+		imported++
+	}
+
+	fmt.Printf("Imported %d patterns from %s\n", imported, inputPath)
+	if skipped > 0 {
+		fmt.Printf("Skipped %d existing patterns\n", skipped)
+	}
+	return nil
 }
