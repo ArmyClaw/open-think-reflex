@@ -1,3 +1,5 @@
+// Package matcher provides pattern matching algorithms for the reflex system.
+// Supports exact matching, keyword matching, and composite matching strategies.
 package matcher
 
 import (
@@ -8,33 +10,46 @@ import (
 	"github.com/ArmyClaw/open-think-reflex/pkg/models"
 )
 
-// Engine is the pattern matching engine
+// Engine is the core pattern matching engine.
+// Combines multiple matching strategies (exact, keyword) and provides
+// configurable filtering and sorting of results.
 type Engine struct {
-	exactMatcher  *ExactMatcher
-	keywordMatcher *KeywordMatcher
+	exactMatcher    *ExactMatcher   // Exact string matching
+	keywordMatcher   *KeywordMatcher // Fuzzy keyword matching
 }
 
-// NewEngine creates a new matching engine
+// NewEngine creates a new matching engine with default matchers.
+// The engine uses exact matching (highest confidence) and keyword
+// matching (lower confidence) strategies.
 func NewEngine() *Engine {
 	return &Engine{
-		exactMatcher:  NewExactMatcher(),
-		keywordMatcher: NewKeywordMatcher(),
+		exactMatcher:    NewExactMatcher(),
+		keywordMatcher:  NewKeywordMatcher(),
 	}
 }
 
-// Match finds patterns matching the query
+// Match finds all patterns matching the given query.
+// Returns results sorted by confidence (highest first).
+//
+// Matching strategy:
+// 1. Run matchers based on ExactFirst option
+// 2. Filter results by Threshold
+// 3. Sort by confidence (descending)
+// 4. Limit to requested count
 func (e *Engine) Match(ctx context.Context, query string, patterns []*models.Pattern, opts contracts.MatchOptions) []contracts.MatchResult {
+	// Early exit for empty inputs
 	if len(patterns) == 0 || query == "" {
 		return nil
 	}
 
 	var allResults []contracts.MatchResult
 
-	// Exact match first (highest priority)
+	// Run matchers in configured order
 	if opts.ExactFirst {
+		// Exact match first (higher priority)
 		exactResults := e.exactMatcher.Match(ctx, query, patterns)
 		allResults = append(allResults, exactResults...)
-		
+
 		// Then keyword match
 		keywordResults := e.keywordMatcher.Match(ctx, query, patterns)
 		allResults = append(allResults, keywordResults...)
@@ -42,7 +57,7 @@ func (e *Engine) Match(ctx context.Context, query string, patterns []*models.Pat
 		// Keyword match first
 		keywordResults := e.keywordMatcher.Match(ctx, query, patterns)
 		allResults = append(allResults, keywordResults...)
-		
+
 		// Then exact match
 		exactResults := e.exactMatcher.Match(ctx, query, patterns)
 		allResults = append(allResults, exactResults...)
@@ -61,7 +76,7 @@ func (e *Engine) Match(ctx context.Context, query string, patterns []*models.Pat
 		return filtered[i].Confidence > filtered[j].Confidence
 	})
 
-	// Limit results
+	// Apply limit
 	if opts.Limit > 0 && len(filtered) > opts.Limit {
 		filtered = filtered[:opts.Limit]
 	}
@@ -69,14 +84,16 @@ func (e *Engine) Match(ctx context.Context, query string, patterns []*models.Pat
 	return filtered
 }
 
-// MatchOne finds the best match
+// MatchOne finds the single best match for the query.
+// Convenience method equivalent to Match with Limit=1.
+// Returns nil if no match found.
 func (e *Engine) MatchOne(ctx context.Context, query string, patterns []*models.Pattern) *contracts.MatchResult {
 	opts := contracts.MatchOptions{
 		Threshold:  0,
 		Limit:      1,
 		ExactFirst: true,
 	}
-	
+
 	results := e.Match(ctx, query, patterns, opts)
 	if len(results) > 0 {
 		return &results[0]

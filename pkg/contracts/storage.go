@@ -1,3 +1,5 @@
+// Package contracts defines the core interfaces for Open-Think-Reflex.
+// These interfaces establish the contracts between different layers of the application.
 package contracts
 
 import (
@@ -6,39 +8,92 @@ import (
 	"github.com/ArmyClaw/open-think-reflex/pkg/models"
 )
 
-// Storage defines the interface for pattern persistence
+// Storage defines the interface for pattern and space persistence.
+// Implementations must be thread-safe and handle concurrent access.
 type Storage interface {
-	// Pattern operations
+	// ==================== Pattern Operations ====================
+
+	// SavePattern creates or updates a pattern in storage.
+	// If the pattern has an empty ID, a new ID will be generated.
 	SavePattern(ctx context.Context, p *models.Pattern) error
+
+	// GetPattern retrieves a pattern by its ID.
+	// Returns ErrNotFound if no pattern exists with the given ID.
 	GetPattern(ctx context.Context, id string) (*models.Pattern, error)
+
+	// ListPatterns retrieves patterns matching the given filter options.
+	// Results are ordered by creation time (newest first).
 	ListPatterns(ctx context.Context, opts ListOptions) ([]*models.Pattern, error)
+
+	// DeletePattern removes a pattern by its ID.
+	// Returns ErrNotFound if no pattern exists with the given ID.
 	DeletePattern(ctx context.Context, id string) error
+
+	// UpdatePattern updates an existing pattern.
+	// Returns ErrNotFound if no pattern exists with the given ID.
 	UpdatePattern(ctx context.Context, p *models.Pattern) error
 
-	// Space operations
+	// ==================== Space Operations ====================
+
+	// CreateSpace creates a new space for organizing patterns.
 	CreateSpace(ctx context.Context, s *models.Space) error
+
+	// GetSpace retrieves a space by its ID.
+	// Returns ErrNotFound if no space exists with the given ID.
 	GetSpace(ctx context.Context, id string) (*models.Space, error)
+
+	// ListSpaces retrieves all spaces in the system.
 	ListSpaces(ctx context.Context) ([]*models.Space, error)
 
-	// Transaction support
+	// ==================== Transaction Support ====================
+
+	// BeginTx starts a new database transaction.
+	// The caller must explicitly commit or rollback the transaction.
 	BeginTx(ctx context.Context) (Transaction, error)
 
-	// Close
+	// Close releases all resources held by the storage.
+	// After Close returns, the storage should not be used.
 	Close() error
 }
 
-// ListOptions contains filtering options for pattern listing
+// ListOptions contains filtering options for pattern listing.
+// All fields are optional - zero values are ignored.
 type ListOptions struct {
-	Tags         []string
-	Project      string
-	MinStrength  float64
-	Limit        int
-	Offset       int
+	// Tags filters patterns containing any of these tags.
+	// Default: nil (no filter)
+	Tags []string
+
+	// Project filters patterns by project name.
+	// Default: "" (no filter)
+	Project string
+
+	// MinStrength filters patterns with strength >= this value.
+	// Default: 0.0 (no filter)
+	MinStrength float64
+
+	// Limit restricts the maximum number of results.
+	// Default: 0 (no limit)
+	Limit int
+
+	// Offset specifies the number of results to skip.
+	// Use with Limit for pagination.
+	// Default: 0
+	Offset int
+
+	// IncludeDeleted specifies whether to include deleted patterns.
+	// Default: false
 	IncludeDeleted bool
 }
 
-// Transaction defines the interface for database transactions
+// Transaction defines the interface for database transactions.
+// Transactions provide atomicity - either all operations succeed
+// or none are applied.
 type Transaction interface {
+	// Commit applies all changes made within the transaction.
+	// After Commit returns successfully, the transaction is closed.
 	Commit() error
+
+	// Rollback undoes all changes made within the transaction.
+	// After Rollback returns, the transaction is closed.
 	Rollback() error
 }
