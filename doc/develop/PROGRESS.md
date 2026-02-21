@@ -8,7 +8,7 @@
 
 ### 项目状态
 - **版本**: v1.1.0 (开发中)
-- **当前迭代**: Iter 56 ✅ 已完成
+- **当前迭代**: Iter 57 ✅ 已完成
 - **阶段**: Phase 7 - UI 改进
 
 ### Sprint 5 计划
@@ -17,14 +17,19 @@
 | 性能优化 | 8 | ✅ 已完成 |
 | UI改进 | 8 | 待开始 |
 
+### Iter 57 完成 ✅ (2026-02-22 01:35)
+- 错误美化 - 彩色错误提示
+- 新增 pkg/errors/errors.go:
+  - ErrorWithContext 结构体
+  - 错误类型 (Validation/NotFound/Database/Network/Auth)
+  - WithSuggestion 建议功能
+  - FormatForDisplay 彩色输出
+  - 便捷函数 (ValidationError/NotFoundError/DatabaseError)
+- 9个单元测试全部通过
+- 已推送到 GitHub
+
 ### Iter 56 完成 ✅ (2026-02-22 00:45)
 - 加载动画 - AI 响应时显示 spinner
-- 新增 OutputView.StartLoading/StopLoading 方法
-- 实现 10 帧 spinner 动画 (100ms 间隔)
-- 支持自定义加载消息
-- 使用 goroutine 实现非阻塞动画
-- 添加 IsLoading 状态查询
-- 已推送到 GitHub
 
 ### Iter 55 完成 ✅ (2026-02-22 00:30)
 - 彩色输出基础 - 语法高亮功能
