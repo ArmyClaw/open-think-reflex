@@ -97,10 +97,14 @@ func (s *Storage) GetPattern(ctx context.Context, id string) (*models.Pattern, e
 
 	// Parse JSON fields
 	if connections.Valid {
-		json.Unmarshal([]byte(connections.String), &p.Connections)
+		if err := json.Unmarshal([]byte(connections.String), &p.Connections); err != nil {
+			return nil, fmt.Errorf("failed to parse connections for pattern %s: %w", id, err)
+		}
 	}
 	if tags.Valid {
-		json.Unmarshal([]byte(tags.String), &p.Tags)
+		if err := json.Unmarshal([]byte(tags.String), &p.Tags); err != nil {
+			return nil, fmt.Errorf("failed to parse tags for pattern %s: %w", id, err)
+		}
 	}
 	p.CreatedAt = int64ToTime(createdAt)
 	p.UpdatedAt = int64ToTime(updatedAt)
@@ -164,10 +168,14 @@ func (s *Storage) ListPatterns(ctx context.Context, opts contracts.ListOptions) 
 		}
 
 		if connections.Valid {
-			json.Unmarshal([]byte(connections.String), &p.Connections)
+			if err := json.Unmarshal([]byte(connections.String), &p.Connections); err != nil {
+				return nil, fmt.Errorf("failed to parse connections: %w", err)
+			}
 		}
 		if tags.Valid {
-			json.Unmarshal([]byte(tags.String), &p.Tags)
+			if err := json.Unmarshal([]byte(tags.String), &p.Tags); err != nil {
+				return nil, fmt.Errorf("failed to parse tags: %w", err)
+			}
 		}
 		p.CreatedAt = int64ToTime(createdAt)
 		p.UpdatedAt = int64ToTime(updatedAt)
@@ -495,10 +503,14 @@ func (s *Storage) GetPatternByTrigger(ctx context.Context, trigger string) (*mod
 
 	// Parse JSON fields
 	if connections.Valid {
-		json.Unmarshal([]byte(connections.String), &p.Connections)
+			if err := json.Unmarshal([]byte(connections.String), &p.Connections); err != nil {
+				return nil, fmt.Errorf("failed to parse connections: %w", err)
+			}
 	}
 	if tags.Valid {
-		json.Unmarshal([]byte(tags.String), &p.Tags)
+			if err := json.Unmarshal([]byte(tags.String), &p.Tags); err != nil {
+				return nil, fmt.Errorf("failed to parse tags: %w", err)
+			}
 	}
 	p.CreatedAt = int64ToTime(createdAt)
 	p.UpdatedAt = int64ToTime(updatedAt)
@@ -639,10 +651,14 @@ func scanPatternsRows(rows *sql.Rows) ([]*models.Pattern, error) {
 		}
 
 		if connections.Valid {
-			json.Unmarshal([]byte(connections.String), &p.Connections)
+			if err := json.Unmarshal([]byte(connections.String), &p.Connections); err != nil {
+				return nil, fmt.Errorf("failed to parse connections: %w", err)
+			}
 		}
 		if tags.Valid {
-			json.Unmarshal([]byte(tags.String), &p.Tags)
+			if err := json.Unmarshal([]byte(tags.String), &p.Tags); err != nil {
+				return nil, fmt.Errorf("failed to parse tags: %w", err)
+			}
 		}
 		p.CreatedAt = int64ToTime(createdAt)
 		p.UpdatedAt = int64ToTime(updatedAt)
