@@ -8,7 +8,7 @@
 
 ### 项目状态
 - **版本**: v1.1.0 (开发中)
-- **当前迭代**: Iter 50 ✅ 已完成
+- **当前迭代**: Iter 51 ✅ 已完成
 - **阶段**: Phase 6 - 性能优化
 
 ### Sprint 5 计划
@@ -26,6 +26,13 @@
   - BenchmarkSearchPatterns: 12K ops/s (98.5µs/op)
   - BenchmarkBatchSave: 2.7K ops/s (419µs/op)
 - JSON错误处理修复 (4处 json.Unmarshal 添加错误返回)
+- 所有测试通过 ✅
+
+### Iter 51 完成 ✅ (2026-02-21 22:40)
+- 连接池优化
+- 新增 OptimizePool 方法: 动态调整连接池参数
+- 新增 PoolMetrics 结构体: 扩展连接池统计
+- 新增 PoolStatsExt 方法: 返回扩展连接池指标
 - 所有测试通过 ✅
 
 ### Iter 50 完成 ✅ (2026-02-21 22:35)
