@@ -117,3 +117,11 @@ func DatabaseError(err error) *ErrorWithContext {
 	return Wrap(err, ErrTypeDatabase, "Database operation failed").
 		WithSuggestion("Check database connection and try again")
 }
+
+// WrapIf wraps an error only if it's not nil
+func WrapIf(err error, errType ErrorType, message string) *ErrorWithContext {
+	if err == nil {
+		return nil
+	}
+	return Wrap(err, errType, message)
+}

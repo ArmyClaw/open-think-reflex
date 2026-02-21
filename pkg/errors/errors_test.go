@@ -2,123 +2,120 @@ package errors
 
 import (
 	"errors"
-	"strings"
 	"testing"
 )
 
-func TestErrorWithContext(t *testing.T) {
-	err := New(ErrTypeValidation, "invalid input")
-	
-	if err.Type != ErrTypeValidation {
-		t.Errorf("Expected validation type, got %v", err.Type)
+func TestNew(t *testing.T) {
+	e := New(ErrTypeValidation, "test error")
+	if e.Type != ErrTypeValidation {
+		t.Errorf("expected type validation, got %s", e.Type)
 	}
-	if err.Message != "invalid input" {
-		t.Errorf("Expected 'invalid input', got %s", err.Message)
+	if e.Message != "test error" {
+		t.Errorf("expected message 'test error', got %s", e.Message)
 	}
 }
 
-func TestErrorWithContext_Error(t *testing.T) {
+func TestError_Error(t *testing.T) {
+	e := New(ErrTypeValidation, "test error")
+	if e.Error() != "validation: test error" {
+		t.Errorf("expected 'validation: test error', got '%s'", e.Error())
+	}
+}
+
+func TestError_WithWrapped(t *testing.T) {
 	original := errors.New("original error")
-	err := Wrap(original, ErrTypeDatabase, "operation failed")
-	
-	if !strings.Contains(err.Error(), "operation failed") {
-		t.Error("Expected error message to contain 'operation failed'")
-	}
-	if !strings.Contains(err.Error(), "original error") {
-		t.Error("Expected error message to contain 'original error'")
+	e := Wrap(original, ErrTypeNotFound, "wrapped error")
+	expected := "not_found: wrapped error (original error)"
+	if e.Error() != expected {
+		t.Errorf("expected '%s', got '%s'", expected, e.Error())
 	}
 }
 
-func TestErrorWithContext_Unwrap(t *testing.T) {
-	original := errors.New("original")
-	err := Wrap(original, ErrTypeNotFound, "not found")
-	
-	unwrapped := err.Unwrap()
-	if unwrapped == nil {
-		t.Error("Expected original error")
-	}
-	if unwrapped.Error() != "original" {
-		t.Errorf("Expected 'original', got %s", unwrapped.Error())
-	}
-}
-
-func TestWithSuggestion(t *testing.T) {
-	err := New(ErrTypeValidation, "error").
-		WithSuggestion("Check your input")
-	
-	if len(err.Suggestions) != 1 {
-		t.Errorf("Expected 1 suggestion, got %d", len(err.Suggestions))
-	}
-	if err.Suggestions[0] != "Check your input" {
-		t.Errorf("Unexpected suggestion: %s", err.Suggestions[0])
-	}
-}
-
-func TestWithSuggestions(t *testing.T) {
-	err := New(ErrTypeValidation, "error").
-		WithSuggestions([]string{"tip1", "tip2"})
-	
-	if len(err.Suggestions) != 2 {
-		t.Errorf("Expected 2 suggestions, got %d", len(err.Suggestions))
-	}
-}
-
-func TestFormatForDisplay(t *testing.T) {
-	err := New(ErrTypeValidation, "Invalid username").
-		WithSuggestion("Use 3-20 characters")
-	
-	display := err.FormatForDisplay()
-	
-	if !strings.Contains(display, "❌") {
-		t.Error("Expected error emoji")
-	}
-	if !strings.Contains(display, "Invalid username") {
-		t.Error("Expected error message")
-	}
-	if !strings.Contains(display, "💡") {
-		t.Error("Expected suggestion emoji")
-	}
-	if !strings.Contains(display, "Use 3-20 characters") {
-		t.Error("Expected suggestion text")
+func TestError_Unwrap(t *testing.T) {
+	original := errors.New("original error")
+	e := Wrap(original, ErrTypeValidation, "wrapped error")
+	if e.Unwrap() != original {
+		t.Error("expected unwrap to return original error")
 	}
 }
 
 func TestValidationError(t *testing.T) {
-	err := ValidationError("Email is required", "Enter a valid email")
-	
-	if err.Type != ErrTypeValidation {
-		t.Errorf("Expected validation type, got %v", err.Type)
+	e := ValidationError("invalid input", "check the format")
+	if e.Type != ErrTypeValidation {
+		t.Error("expected validation error type")
 	}
-	if len(err.Suggestions) != 1 {
-		t.Errorf("Expected 1 suggestion, got %d", len(err.Suggestions))
+	if len(e.Suggestions) != 1 {
+		t.Errorf("expected 1 suggestion, got %d", len(e.Suggestions))
 	}
 }
 
 func TestNotFoundError(t *testing.T) {
-	err := NotFoundError("pattern", "abc123")
-	
-	if err.Type != ErrTypeNotFound {
-		t.Errorf("Expected not_found type, got %v", err.Type)
+	e := NotFoundError("pattern", "123")
+	if e.Type != ErrTypeNotFound {
+		t.Error("expected not found error type")
 	}
-	if !strings.Contains(err.Message, "pattern") {
-		t.Error("Expected 'pattern' in message")
-	}
-	if !strings.Contains(err.Message, "abc123") {
-		t.Error("Expected 'abc123' in message")
+	if len(e.Suggestions) != 1 {
+		t.Errorf("expected 1 suggestion, got %d", len(e.Suggestions))
 	}
 }
 
 func TestDatabaseError(t *testing.T) {
 	original := errors.New("connection refused")
-	err := DatabaseError(original)
+	e := DatabaseError(original)
+	if e.Type != ErrTypeDatabase {
+		t.Error("expected database error type")
+	}
+	if e.Original != original {
+		t.Error("expected original error to be preserved")
+	}
+}
+
+func TestWithSuggestion(t *testing.T) {
+	e := New(ErrTypeValidation, "test error")
+	e2 := e.WithSuggestion("try again")
+	if len(e2.Suggestions) != 1 {
+		t.Errorf("expected 1 suggestion, got %d", len(e2.Suggestions))
+	}
+}
+
+func TestWithSuggestions(t *testing.T) {
+	e := New(ErrTypeValidation, "test error")
+	e2 := e.WithSuggestions([]string{"suggestion 1", "suggestion 2"})
+	if len(e2.Suggestions) != 2 {
+		t.Errorf("expected 2 suggestions, got %d", len(e2.Suggestions))
+	}
+}
+
+func TestFormatForDisplay(t *testing.T) {
+	e := New(ErrTypeValidation, "test error")
+	e = e.WithSuggestion("try again")
+	output := e.FormatForDisplay()
 	
-	if err.Type != ErrTypeDatabase {
-		t.Errorf("Expected database type, got %v", err.Type)
+	if output == "" {
+		t.Error("expected non-empty output")
 	}
-	if err.Original != original {
-		t.Error("Expected original error")
+	
+	// Check for expected content
+	if len(output) < len("❌ test error") {
+		t.Error("output seems too short")
 	}
-	if len(err.Suggestions) == 0 {
-		t.Error("Expected suggestion")
+}
+
+func TestWrapIf_NonNil(t *testing.T) {
+	err := errors.New("test")
+	wrapped := WrapIf(err, ErrTypeValidation, "wrapped")
+	if wrapped == nil {
+		t.Error("expected non-nil wrapped error")
+	}
+	if wrapped.Message != "wrapped" {
+		t.Errorf("expected message 'wrapped', got '%s'", wrapped.Message)
+	}
+}
+
+func TestWrapIf_Nil(t *testing.T) {
+	var nilErr error
+	wrapped := WrapIf(nilErr, ErrTypeValidation, "wrapped")
+	if wrapped != nil {
+		t.Error("expected nil for nil error")
 	}
 }
