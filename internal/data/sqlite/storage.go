@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/ArmyClaw/open-think-reflex/pkg/contracts"
@@ -13,12 +14,17 @@ import (
 
 // Storage implements contracts.Storage using SQLite
 type Storage struct {
-	db *Database
+	db        *Database
+	stmtCache map[string]*sql.Stmt
+	mu        sync.RWMutex
 }
 
 // NewStorage creates a new SQLite storage
 func NewStorage(db *Database) *Storage {
-	return &Storage{db: db}
+	return &Storage{
+		db:        db,
+		stmtCache: make(map[string]*sql.Stmt),
+	}
 }
 
 // SavePattern saves a pattern to the database
@@ -269,9 +275,43 @@ func (s *Storage) BeginTx(ctx context.Context) (contracts.Transaction, error) {
 	return &transaction{tx: tx}, nil
 }
 
-// Close closes the storage
+// Close closes the storage and releases cached statements
 func (s *Storage) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	// Close all cached statements
+	for _, stmt := range s.stmtCache {
+		stmt.Close()
+	}
+	s.stmtCache = make(map[string]*sql.Stmt)
 	return s.db.Close()
+}
+
+// getStmt returns a cached prepared statement or creates a new one
+func (s *Storage) getStmt(ctx context.Context, query string) (*sql.Stmt, error) {
+	s.mu.RLock()
+	stmt, exists := s.stmtCache[query]
+	s.mu.RUnlock()
+
+	if exists {
+		return stmt, nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Double-check after acquiring write lock
+	if stmt, exists := s.stmtCache[query]; exists {
+		return stmt, nil
+	}
+
+	prepared, err := s.db.db.PrepareContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare statement: %w", err)
+	}
+
+	s.stmtCache[query] = prepared
+	return prepared, nil
 }
 
 // SavePatternsBatch saves multiple patterns in a single transaction (Iter 44)
@@ -406,6 +446,198 @@ func (s *Storage) UpdatePatternsBatch(ctx context.Context, patterns []*models.Pa
 	}
 
 	return tx.Commit()
+}
+
+// ==================== Query Optimization Methods (Iter 46) ====================
+
+// GetPatternByTrigger retrieves a pattern by its trigger (exact match)
+// Uses cached statement for better performance
+func (s *Storage) GetPatternByTrigger(ctx context.Context, trigger string) (*models.Pattern, error) {
+	stmt, err := s.getStmt(ctx, `
+		SELECT id, trigger, response, strength, threshold, decay_rate, decay_enabled,
+			connections, created_at, updated_at, reinforcement_count, decay_count,
+			last_used_at, tags, project, user_id, deleted_at
+		FROM patterns WHERE trigger = ? AND deleted_at IS NULL
+	`)
+	if err != nil {
+		return nil, err
+	}
+
+	var p models.Pattern
+	var connections, tags sql.NullString
+	var lastUsedAt, deletedAt, createdAt, updatedAt sql.NullInt64
+
+	err = stmt.QueryRowContext(ctx, trigger).Scan(
+		&p.ID, &p.Trigger, &p.Response, &p.Strength, &p.Threshold, &p.DecayRate, &p.DecayEnabled,
+		&connections, &createdAt, &updatedAt, &p.ReinforceCnt, &p.DecayCnt,
+		&lastUsedAt, &tags, &p.Project, &p.UserID, &deletedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("pattern not found with trigger: %s", trigger)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse JSON fields
+	if connections.Valid {
+		json.Unmarshal([]byte(connections.String), &p.Connections)
+	}
+	if tags.Valid {
+		json.Unmarshal([]byte(tags.String), &p.Tags)
+	}
+	p.CreatedAt = int64ToTime(createdAt)
+	p.UpdatedAt = int64ToTime(updatedAt)
+	p.LastUsedAt = int64ToTimePtr(lastUsedAt)
+	p.DeletedAt = int64ToTimePtr(deletedAt)
+
+	return &p, nil
+}
+
+// CountPatterns returns the total count of patterns matching the given filters
+// More efficient than len(ListPatterns(...))
+func (s *Storage) CountPatterns(ctx context.Context, opts contracts.ListOptions) (int, error) {
+	query := "SELECT COUNT(*) FROM patterns WHERE deleted_at IS NULL"
+	args := []interface{}{}
+
+	if opts.Project != "" {
+		query += " AND project = ?"
+		args = append(args, opts.Project)
+	}
+
+	if opts.MinStrength > 0 {
+		query += " AND strength >= ?"
+		args = append(args, opts.MinStrength)
+	}
+
+	var count int
+	err := s.db.db.QueryRowContext(ctx, query, args...).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count patterns: %w", err)
+	}
+
+	return count, nil
+}
+
+// GetRecentlyUsedPatterns retrieves patterns ordered by last_used_at
+// Useful for "frequently used" features
+func (s *Storage) GetRecentlyUsedPatterns(ctx context.Context, limit int) ([]*models.Pattern, error) {
+	stmt, err := s.getStmt(ctx, `
+		SELECT id, trigger, response, strength, threshold, decay_rate, decay_enabled,
+			connections, created_at, updated_at, reinforcement_count, decay_count,
+			last_used_at, tags, project, user_id
+		FROM patterns 
+		WHERE deleted_at IS NULL AND last_used_at IS NOT NULL
+		ORDER BY last_used_at DESC
+		LIMIT ?
+	`)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := stmt.QueryContext(ctx, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return scanPatternsRows(rows)
+}
+
+// SearchPatterns performs a full-text search on trigger and response
+// Uses LIKE for simplicity - can be upgraded to FTS5 for production
+func (s *Storage) SearchPatterns(ctx context.Context, query string, opts contracts.ListOptions) ([]*models.Pattern, error) {
+	searchPattern := "%" + query + "%"
+
+	baseQuery := `
+		SELECT id, trigger, response, strength, threshold, decay_rate, decay_enabled,
+			connections, created_at, updated_at, reinforcement_count, decay_count,
+			last_used_at, tags, project, user_id
+		FROM patterns 
+		WHERE deleted_at IS NULL 
+		AND (trigger LIKE ? OR response LIKE ?)
+	`
+
+	args := []interface{}{searchPattern, searchPattern}
+
+	if opts.Project != "" {
+		baseQuery += " AND project = ?"
+		args = append(args, opts.Project)
+	}
+
+	baseQuery += " ORDER BY strength DESC"
+
+	if opts.Limit > 0 {
+		baseQuery += " LIMIT ?"
+		args = append(args, opts.Limit)
+	} else {
+		baseQuery += " LIMIT 100" // Default limit for search
+	}
+
+	rows, err := s.db.db.QueryContext(ctx, baseQuery, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return scanPatternsRows(rows)
+}
+
+// GetTopPatterns retrieves the strongest patterns (for matching priority)
+func (s *Storage) GetTopPatterns(ctx context.Context, limit int) ([]*models.Pattern, error) {
+	stmt, err := s.getStmt(ctx, `
+		SELECT id, trigger, response, strength, threshold, decay_rate, decay_enabled,
+			connections, created_at, updated_at, reinforcement_count, decay_count,
+			last_used_at, tags, project, user_id
+		FROM patterns 
+		WHERE deleted_at IS NULL
+		ORDER BY strength DESC
+		LIMIT ?
+	`)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := stmt.QueryContext(ctx, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	return scanPatternsRows(rows)
+}
+
+// scanPatternsRows is a helper to scan pattern rows
+func scanPatternsRows(rows *sql.Rows) ([]*models.Pattern, error) {
+	var patterns []*models.Pattern
+	for rows.Next() {
+		var p models.Pattern
+		var connections, tags sql.NullString
+		var lastUsedAt, createdAt, updatedAt sql.NullInt64
+
+		err := rows.Scan(
+			&p.ID, &p.Trigger, &p.Response, &p.Strength, &p.Threshold, &p.DecayRate, &p.DecayEnabled,
+			&connections, &createdAt, &updatedAt, &p.ReinforceCnt, &p.DecayCnt,
+			&lastUsedAt, &tags, &p.Project, &p.UserID,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if connections.Valid {
+			json.Unmarshal([]byte(connections.String), &p.Connections)
+		}
+		if tags.Valid {
+			json.Unmarshal([]byte(tags.String), &p.Tags)
+		}
+		p.CreatedAt = int64ToTime(createdAt)
+		p.UpdatedAt = int64ToTime(updatedAt)
+		p.LastUsedAt = int64ToTimePtr(lastUsedAt)
+
+		patterns = append(patterns, &p)
+	}
+	return patterns, rows.Err()
 }
 
 // Helper functions
