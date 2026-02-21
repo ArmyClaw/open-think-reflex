@@ -9,135 +9,163 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Config represents the application configuration
+// Package config provides configuration loading and management for Open-Think-Reflex.
+// Supports YAML configuration files with environment variable overrides.
+package config
+
+import (
+	"fmt"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/spf13/viper"
+)
+
+// Config represents the top-level application configuration.
+// All settings can be overridden via environment variables (e.g., OTR_AI_PROVIDER).
 type Config struct {
-	// Version for config migration
+	// Version for config migration tracking
 	Version int `mapstructure:"version"`
 
-	// Application settings
+	// Application-level settings
 	App AppConfig `mapstructure:"app"`
 
-	// Storage settings
+	// Storage backend configuration
 	Storage StorageConfig `mapstructure:"storage"`
 
 	// AI provider settings
 	AI AIConfig `mapstructure:"ai"`
 
-	// UI settings
+	// Terminal UI settings
 	UI UIConfig `mapstructure:"ui"`
 
-	// Security settings
+	// Security and audit settings
 	Security SecurityConfig `mapstructure:"security"`
 }
 
-// AppConfig contains application-level settings
+// AppConfig contains application-level settings.
 type AppConfig struct {
-	Name        string `mapstructure:"name"`
-	Version     string `mapstructure:"version"`
-	DataDir     string `mapstructure:"data_dir"`
-	LogLevel    string `mapstructure:"log_level"`
-	Profile     bool   `mapstructure:"profile"`
+	Name     string `mapstructure:"name"`     // Application name
+	Version  string `mapstructure:"version"`  // Version string
+	DataDir  string `mapstructure:"data_dir"` // Data directory path
+	LogLevel string `mapstructure:"log_level"` // Log level (debug, info, warn, error)
+	Profile  bool   `mapstructure:"profile"`  // Enable profiling
 }
 
-// StorageConfig contains storage-related settings
+// StorageConfig contains storage backend settings.
 type StorageConfig struct {
-	Type     string `mapstructure:"type"`
-	Path     string `mapstructure:"path"`
-	CacheSize int   `mapstructure:"cache_size"`
+	Type      string `mapstructure:"type"`       // Storage type (sqlite, etc.)
+	Path      string `mapstructure:"path"`       // Database file path
+	CacheSize int    `mapstructure:"cache_size"` // LRU cache capacity
 }
 
-// AIConfig contains AI provider settings
+// AIConfig contains AI provider configuration.
 type AIConfig struct {
-	Provider     string         `mapstructure:"provider"`
-	Providers    ProvidersConfig `mapstructure:"providers"`
-	DefaultModel string        `mapstructure:"default_model"`
-	Timeout      int           `mapstructure:"timeout"`
-	RetryMax     int           `mapstructure:"retry_max"`
+	Provider     string         `mapstructure:"provider"`      // Primary provider (anthropic, openai, local)
+	Providers    ProvidersConfig `mapstructure:"providers"`   // Per-provider settings
+	DefaultModel string         `mapstructure:"default_model"` // Default model name
+	Timeout      int            `mapstructure:"timeout"`       // Request timeout (seconds)
+	RetryMax     int            `mapstructure:"retry_max"`    // Max retry attempts
 }
 
-// ProvidersConfig contains per-provider settings
+// ProvidersConfig contains per-provider settings.
 type ProvidersConfig struct {
-	Anthropic AnthropicConfig `mapstructure:"anthropic"`
-	OpenAI    OpenAIConfig    `mapstructure:"openai"`
-	Local     LocalConfig     `mapstructure:"local"`
+	Anthropic AnthropicConfig `mapstructure:"anthropic"` // Anthropic Claude settings
+	OpenAI    OpenAIConfig    `mapstructure:"openai"`    // OpenAI settings
+	Local     LocalConfig     `mapstructure:"local"`     // Local model settings
 }
 
-// AnthropicConfig contains Anthropic-specific settings
+// AnthropicConfig contains Anthropic Claude-specific settings.
+// API key can be set via config or OTR_ANTHROPIC_API_KEY environment variable.
 type AnthropicConfig struct {
-	APIKey      string  `mapstructure:"api_key"`
-	APIURL      string  `mapstructure:"api_url"`
-	Model       string  `mapstructure:"model"`
-	MaxTokens   int     `mapstructure:"max_tokens"`
-	Temperature float64 `mapstructure:"temperature"`
+	APIKey      string  `mapstructure:"api_key"`       // Anthropic API key
+	APIURL      string  `mapstructure:"api_url"`       // API endpoint (for proxy/regional)
+	Model       string  `mapstructure:"model"`         // Default model
+	MaxTokens   int     `mapstructure:"max_tokens"`    // Max tokens per request
+	Temperature float64 `mapstructure:"temperature"`    // Temperature (0.0-1.0)
 }
 
-// OpenAIConfig contains OpenAI-specific settings
+// OpenAIConfig contains OpenAI-specific settings.
 type OpenAIConfig struct {
-	APIKey      string  `mapstructure:"api_key"`
-	APIURL      string  `mapstructure:"api_url"`
-	Model       string  `mapstructure:"model"`
-	MaxTokens   int     `mapstructure:"max_tokens"`
-	Temperature float64 `mapstructure:"temperature"`
+	APIKey      string  `mapstructure:"api_key"`       // OpenAI API key
+	APIURL      string  `mapstructure:"api_url"`       // API endpoint
+	Model       string  `mapstructure:"model"`         // Default model
+	MaxTokens   int     `mapstructure:"max_tokens"`    // Max tokens per request
+	Temperature float64 `mapstructure:"temperature"`    // Temperature (0.0-1.0)
 }
 
-// LocalConfig contains local AI settings
+// LocalConfig contains settings for local AI models (Ollama, LM Studio, etc.).
 type LocalConfig struct {
-	APIURL string `mapstructure:"api_url"`
-	Model  string `mapstructure:"model"`
+	APIURL string `mapstructure:"api_url"` // Local server URL (e.g., http://localhost:11434)
+	Model  string `mapstructure:"model"`   // Model name
 }
 
-// UIConfig contains UI-related settings
+// LocalConfig contains settings for local AI models (Ollama, LM Studio, etc.).
+type LocalConfig struct {
+	APIURL string `mapstructure:"api_url"` // Local server URL (e.g., http://localhost:11434)
+	Model  string `mapstructure:"model"`   // Model name
+}
+
+// UIConfig contains terminal UI configuration.
 type UIConfig struct {
-	Theme      string      `mapstructure:"theme"`
-	Colors     ColorsConfig `mapstructure:"colors"`
-	KeyMap     KeyMapConfig `mapstructure:"keymap"`
-	OutputMode string     `mapstructure:"output_mode"`
+	Theme      string      `mapstructure:"theme"`       // Theme name (dark, light)
+	Colors     ColorsConfig `mapstructure:"colors"`     // Color scheme
+	KeyMap     KeyMapConfig `mapstructure:"keymap"`     // Keyboard shortcuts
+	OutputMode string     `mapstructure:"output_mode"` // Output format (terminal, json)
 }
 
-// ColorsConfig contains color settings
+// ColorsConfig contains terminal color settings (hex color codes).
 type ColorsConfig struct {
-	Root        string `mapstructure:"root"`
-	Branch      string `mapstructure:"branch"`
-	Selected    string `mapstructure:"selected"`
-	Unmatched   string `mapstructure:"unmatched"`
-	Background  string `mapstructure:"background"`
+	Root        string `mapstructure:"root"`         // Root node color
+	Branch      string `mapstructure:"branch"`       // Branch color
+	Selected    string `mapstructure:"selected"`     // Selected item color
+	Unmatched   string `mapstructure:"unmatched"`     // Unmatched item color
+	Background  string `mapstructure:"background"`    // Background color
 }
 
-// KeyMapConfig contains keyboard mapping settings
+// KeyMapConfig contains keyboard shortcut mappings.
+// Default is vim-style navigation.
 type KeyMapConfig struct {
-	Up      string `mapstructure:"up"`
-	Down    string `mapstructure:"down"`
-	Left    string `mapstructure:"left"`
-	Right   string `mapstructure:"right"`
-	Select  string `mapstructure:"select"`
-	Confirm string `mapstructure:"confirm"`
-	Cancel  string `mapstructure:"cancel"`
-	Quit    string `mapstructure:"quit"`
-	Help    string `mapstructure:"help"`
+	Up      string `mapstructure:"up"`       // Move up
+	Down    string `mapstructure:"down"`     // Move down
+	Left    string `mapstructure:"left"`     // Move left
+	Right   string `mapstructure:"right"`    // Move right
+	Select  string `mapstructure:"select"`   // Select item
+	Confirm string `mapstructure:"confirm"`  // Confirm action
+	Cancel  string `mapstructure:"cancel"`   // Cancel action
+	Quit    string `mapstructure:"quit"`     // Quit application
+	Help    string `mapstructure:"help"`     // Show help
 }
 
-// SecurityConfig contains security-related settings
+// SecurityConfig contains security-related settings.
 type SecurityConfig struct {
-	APIKeysEnvPrefix string     `mapstructure:"api_keys_env_prefix"`
-	ConfigFileMode   string     `mapstructure:"config_file_mode"`
-	AuditLog         AuditConfig `mapstructure:"audit_log"`
+	APIKeysEnvPrefix string     `mapstructure:"api_keys_env_prefix"` // Env var prefix for API keys
+	ConfigFileMode   string     `mapstructure:"config_file_mode"`   // Config file permissions
+	AuditLog         AuditConfig `mapstructure:"audit_log"`         // Audit logging settings
 }
 
-// AuditConfig contains audit log settings
+// AuditConfig contains audit logging configuration.
 type AuditConfig struct {
-	Enabled bool   `mapstructure:"enabled"`
-	Path    string `mapstructure:"path"`
+	Enabled bool   `mapstructure:"enabled"` // Enable audit logging
+	Path    string `mapstructure:"path"`   // Audit log file path
 }
 
-// Loader handles configuration loading
+// Loader handles configuration loading from files with environment variable overrides.
+// Uses Viper for flexible configuration management.
 type Loader struct {
-	configPath string
-	configName string
-	configType string
-	v          *viper.Viper
+	configPath string     // Directory containing config file
+	configName string     // Config file name (without extension)
+	configType string     // Config file type (yaml, json, toml)
+	v          *viper.Viper // Viper instance for config management
 }
 
-// NewLoader creates a new configuration loader
+// NewLoader creates a new configuration loader.
+//
+// Example:
+//
+//	loader := NewLoader("/home/user/.config/reflex", "config")
+//	cfg, err := loader.Load()
 func NewLoader(configPath, configName string) *Loader {
 	return &Loader{
 		configPath: configPath,

@@ -1,3 +1,5 @@
+// Package ai provides AI provider implementations.
+// This file implements the Anthropic Claude provider using the official SDK.
 package ai
 
 import (
@@ -14,14 +16,26 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/packages/ssestream"
 )
 
-// ClaudeProvider implements Provider for Anthropic's Claude
+// ClaudeProvider implements the Provider interface for Anthropic's Claude models.
+// Uses the official Anthropic SDK for API communication.
+// Thread-safe: can handle concurrent requests.
 type ClaudeProvider struct {
-	config     *Config
-	httpClient *http.Client
-	client     anthropic.Client
+	config     *Config            // Provider configuration
+	httpClient *http.Client       // HTTP client for custom requests
+	client     anthropic.Client   // Official Anthropic SDK client
 }
 
-// NewClaudeProvider creates a new Claude provider
+// NewClaudeProvider creates a new Claude provider with the given options.
+// Default configuration:
+//   - Model: claude-3-sonnet-20240229
+//   - MaxTokens: 1024
+//   - Temperature: 0.7
+//
+// Example:
+//   provider := NewClaudeProvider(
+//       WithAPIKey("sk-ant-..."),
+//       WithModel("claude-3-5-sonnet-20241022"),
+//   )
 func NewClaudeProvider(opts ...Option) *ClaudeProvider {
 	cfg := &Config{
 		Model:       "claude-3-sonnet-20240229",
@@ -29,11 +43,12 @@ func NewClaudeProvider(opts ...Option) *ClaudeProvider {
 		Temperature: 0.7,
 	}
 
+	// Apply functional options
 	for _, opt := range opts {
 		opt(cfg)
 	}
 
-	// Create Anthropic client with API key
+	// Initialize Anthropic SDK client
 	anthropicClient := anthropic.NewClient(
 		option.WithAPIKey(cfg.APIKey),
 	)
@@ -45,13 +60,15 @@ func NewClaudeProvider(opts ...Option) *ClaudeProvider {
 	}
 }
 
-// Name returns the provider name
+// Name returns the provider identifier.
 func (p *ClaudeProvider) Name() string {
 	return "claude"
 }
 
-// Generate generates a response for the given prompt
+// Generate creates a complete response from Claude.
+// Blocks until the full response is received.
 func (p *ClaudeProvider) Generate(ctx context.Context, req *Request) (*Response, error) {
+	// Apply defaults from config if not specified in request
 	model := req.Model
 	if model == "" {
 		model = p.config.Model
@@ -67,7 +84,7 @@ func (p *ClaudeProvider) Generate(ctx context.Context, req *Request) (*Response,
 		temp = p.config.Temperature
 	}
 
-	// Build message request
+	// Build message request parameters
 	messageReq := anthropic.MessageNewParams{
 		Model:       anthropic.Model(model),
 		MaxTokens:   int64(maxTokens),
@@ -89,13 +106,14 @@ func (p *ClaudeProvider) Generate(ctx context.Context, req *Request) (*Response,
 		}
 	}
 
-	// Send request
+	// Send request to Claude API
 	resp, err := p.client.Messages.New(ctx, messageReq)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate: %w", err)
 	}
 
-	// Extract content from ContentBlockUnion
+	// Extract text content from response blocks
+	// Claude can return multiple content blocks (text, images, etc.)
 	var content string
 	for _, block := range resp.Content {
 		if block.Type == "text" {
@@ -115,8 +133,21 @@ func (p *ClaudeProvider) Generate(ctx context.Context, req *Request) (*Response,
 	}, nil
 }
 
-// GenerateStream generates a streaming response
+// GenerateStream creates a streaming response from Claude.
+// Returns an io.ReadCloser that yields response chunks as they arrive.
+// The caller MUST close the reader to release resources.
+//
+// The stream format is Server-Sent Events (SSE):
+//   data: Hello
+//   data: !
+//
+// Example usage:
+//   reader, err := provider.GenerateStream(ctx, req)
+//   if err != nil { ... }
+//   defer reader.Close()
+//   io.Copy(os.Stdout, reader)
 func (p *ClaudeProvider) GenerateStream(ctx context.Context, req *Request) (io.ReadCloser, error) {
+	// Apply defaults
 	model := req.Model
 	if model == "" {
 		model = p.config.Model
@@ -148,22 +179,23 @@ func (p *ClaudeProvider) GenerateStream(ctx context.Context, req *Request) (io.R
 		}
 	}
 
-	// Create streaming response
+	// Create streaming response from Anthropic SDK
 	stream := p.client.Messages.NewStreaming(ctx, messageReq)
 
-	// Return a reader that wraps the stream
+	// Wrap in our streamReader for io.ReadCloser compatibility
 	return newStreamReader(stream), nil
 }
 
-// streamReader wraps the SSE stream to implement io.ReadCloser
+// streamReader wraps the Anthropic SSE stream to implement io.ReadCloser.
+// Handles the complex event types from Anthropic's streaming API.
 type streamReader struct {
-	stream   *ssestream.Stream[anthropic.MessageStreamEventUnion]
-	mu       sync.Mutex
-	buffer   []byte
-	closed   bool
+	stream *ssestream.Stream[anthropic.MessageStreamEventUnion]
+	mu     sync.Mutex
+	buffer []byte   // Buffered data not yet returned
+	closed bool     // Whether Close() was called
 }
 
-// newStreamReader creates a new stream reader
+// newStreamReader creates a new stream reader wrapping the Anthropic stream.
 func newStreamReader(stream *ssestream.Stream[anthropic.MessageStreamEventUnion]) *streamReader {
 	return &streamReader{
 		stream: stream,
@@ -171,7 +203,9 @@ func newStreamReader(stream *ssestream.Stream[anthropic.MessageStreamEventUnion]
 	}
 }
 
-// Read implements io.Reader
+// Read implements io.Reader.
+// Reads the next chunk of the streaming response.
+// Returns io.EOF when the stream is complete.
 func (r *streamReader) Read(p []byte) (n int, err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -180,7 +214,7 @@ func (r *streamReader) Read(p []byte) (n int, err error) {
 		return 0, io.EOF
 	}
 
-	// If we have buffered data, return it
+	// Return buffered data first
 	if len(r.buffer) > 0 {
 		copy(p, r.buffer)
 		r.buffer = r.buffer[len(p):]
@@ -202,22 +236,23 @@ func (r *streamReader) Read(p []byte) (n int, err error) {
 
 		event := r.stream.Current()
 
-		// Handle different event types using type assertions
+		// Handle different event types
 		var text string
 		switch event.Type {
 		case "content_block_delta":
-			// Use the AsContentBlockDelta method to get the proper type
+			// Text delta - most common event type
 			deltaEvent := event.AsContentBlockDelta()
 			text = string(deltaEvent.Delta.Text)
 		case "message_delta":
-			// Final message delta - can be used for usage stats
+			// Final message delta - contains usage stats
 		case "message_stop":
+			// Stream complete
 			r.closed = true
 			return 0, io.EOF
 		}
 
 		if text != "" {
-			// Convert to SSE format
+			// Format as SSE (Server-Sent Events)
 			data := "data: " + text + "\n\n"
 			r.buffer = []byte(data)
 
@@ -228,7 +263,8 @@ func (r *streamReader) Read(p []byte) (n int, err error) {
 	}
 }
 
-// Close implements io.Closer
+// Close implements io.Closer.
+// Must be called when done reading to release resources.
 func (r *streamReader) Close() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -240,17 +276,19 @@ func (r *streamReader) Close() error {
 	return nil
 }
 
-// StreamEvent represents a streaming event
+// StreamEvent represents a parsed streaming event.
+// Used internally for SSE parsing.
 type StreamEvent struct {
-	Type      string          `json:"type"`
-	Delta     json.RawMessage `json:"delta,omitempty"`
-	Index     int             `json:"index,omitempty"`
-	Content   string          `json:"content,omitempty"`
-	Usage     *Usage          `json:"usage,omitempty"`
-	FinishReason string       `json:"finish_reason,omitempty"`
+	Type         string          `json:"type"`
+	Delta        json.RawMessage `json:"delta,omitempty"`
+	Index        int             `json:"index,omitempty"`
+	Content      string          `json:"content,omitempty"`
+	Usage        *Usage          `json:"usage,omitempty"`
+	FinishReason string          `json:"finish_reason,omitempty"`
 }
 
-// parseStreamEvent parses a line from the stream
+// parseStreamEvent parses a line from the SSE stream.
+// Returns nil if the line is not a data event.
 func parseStreamEvent(line string) (*StreamEvent, error) {
 	if !strings.HasPrefix(line, "data: ") {
 		return nil, nil
@@ -269,8 +307,10 @@ func parseStreamEvent(line string) (*StreamEvent, error) {
 	return &event, nil
 }
 
-// ValidateKey validates the API key
+// ValidateKey checks if the API key is valid by making a minimal request.
+// Returns nil if the key is valid, error otherwise.
 func (p *ClaudeProvider) ValidateKey(ctx context.Context) error {
+	// Use minimal request to validate key
 	req := &Request{
 		Prompt:   "Hello",
 		MaxTokens: 10,
