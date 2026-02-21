@@ -140,3 +140,41 @@ func TestDeletePattern_NotFound(t *testing.T) {
 	err := deletePattern(storage, "non-existent-id")
 	assert.NoError(t, err)
 }
+
+func TestListSpaces_Empty(t *testing.T) {
+	storage := setupTestStorage(t)
+	err := listSpaces(storage)
+	assert.NoError(t, err)
+}
+
+func TestCreateSpace(t *testing.T) {
+	storage := setupTestStorage(t)
+
+	err := createSpace(storage, "test-space", "Test space description")
+	assert.NoError(t, err)
+}
+
+func TestGenerateSpaceID(t *testing.T) {
+	id1 := generateSpaceID()
+	id2 := generateSpaceID()
+	
+	// IDs should be unique
+	if id1 == id2 {
+		t.Error("Expected unique IDs")
+	}
+	
+	// IDs should not be empty
+	if id1 == "" {
+		t.Error("Expected non-empty ID")
+	}
+}
+
+func TestBuildCommands(t *testing.T) {
+	storage := setupTestStorage(t)
+	commands := BuildCommands(storage)
+	
+	// Should return some commands
+	if len(commands) == 0 {
+		t.Error("Expected some commands")
+	}
+}

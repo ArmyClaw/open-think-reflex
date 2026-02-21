@@ -164,3 +164,24 @@ func (c *Config) GetServer() ServerConfig {
 	defer c.mu.RUnlock()
 	return c.Server
 }
+
+// SetDatabase sets database config
+func (c *Config) SetDatabase(db DatabaseConfig) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.Database = db
+}
+
+// SetCache sets cache config
+func (c *Config) SetCache(cache CacheConfig) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.Cache = cache
+}
+
+// SetServer sets server config
+func (c *Config) SetServer(server ServerConfig) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.Server = server
+}
