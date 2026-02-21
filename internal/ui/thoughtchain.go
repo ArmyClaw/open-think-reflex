@@ -1,3 +1,10 @@
+// Package ui provides the terminal user interface (TUI) for Open-Think-Reflex.
+// Uses tview for rich terminal UI components.
+//
+// The UI consists of three main layers:
+//   - Layer 1: Thought Chain Tree (pattern matching results)
+//   - Layer 2: Output View (AI-generated content)
+//   - Layer 3: Input Area (user input)
 package ui
 
 import (
@@ -7,25 +14,27 @@ import (
 	"github.com/rivo/tview"
 )
 
-// ThoughtChainNode represents a node in the thought chain tree
+// ThoughtChainNode represents a node in the thought chain tree.
+// Each node corresponds to a match result, optionally with child branches.
 type ThoughtChainNode struct {
-	Result    *contracts.MatchResult
-	Children  []*ThoughtChainNode
-	Expanded  bool
-	Level     int
+	Result    *contracts.MatchResult // The match result for this node
+	Children  []*ThoughtChainNode   // Child branches (sub-matches)
+	Expanded  bool                  // Whether children are visible
+	Level     int                   // Tree depth (0 = root)
 }
 
-// ThoughtChainView displays the thought chain tree (Layer 1)
+// ThoughtChainView displays the thought chain tree (Layer 1).
+// Shows pattern matching results as an interactive tree structure.
 type ThoughtChainView struct {
-	view     *tview.TextView
-	theme    *Theme
-	results  []contracts.MatchResult
-	nodes    []*ThoughtChainNode
-	selected int
-	focused  bool
+	view     *tview.TextView // tview text view component
+	theme    *Theme          // Active theme for colors
+	results  []contracts.MatchResult // Raw match results
+	nodes    []*ThoughtChainNode     // Tree structure
+	selected int          // Currently selected node index
+	focused  bool         // Whether this view has focus
 }
 
-// NewThoughtChainView creates a new thought chain view
+// NewThoughtChainView creates a new thought chain view with the given theme.
 func NewThoughtChainView(theme *Theme) *ThoughtChainView {
 	v := &ThoughtChainView{
 		theme:    theme,
