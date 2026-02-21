@@ -30,6 +30,7 @@ type App struct {
 	shortcutBar  *ShortcutBar
 	filterPanel  *FilterPanel
 	statsPanel   *StatsPanel
+	patternForm  *PatternFormPanel
 	
 	// State
 	currentSpace *models.Space
@@ -37,6 +38,7 @@ type App struct {
 	results      []contracts.MatchResult
 	mode         AppMode // input, navigation
 	showStats    bool
+	showForm     bool
 }
 
 // AppMode represents the current interaction mode
@@ -122,6 +124,10 @@ func (a *App) setupPages() {
 	a.filterPanel = NewFilterPanel()
 	a.statsPanel = NewStatsPanel()
 	a.showStats = false
+	a.showForm = false
+	
+	// Create pattern form panel
+	a.patternForm = NewPatternFormPanel(a.theme, a.handlePatternSave, a.handlePatternCancel)
 	
 	// Set up filter callback
 	a.filterPanel.onFilter = a.filterPatterns
@@ -143,6 +149,7 @@ func (a *App) setupPages() {
 	a.pages.AddPage("help", a.helpPanel.View(), false, false)
 	a.pages.AddPage("filter", a.filterPanel.GetView(), false, false)
 	a.pages.AddPage("stats", a.statsPanel.GetView(), false, false)
+	a.pages.AddPage("form", a.patternForm.GetView(), false, false)
 }
 
 func (a *App) createHeader() tview.Primitive {
@@ -323,6 +330,30 @@ func (a *App) setupKeyBindings() {
 					a.updateOutputForSelection()
 				}
 				return nil
+			case 'c':
+				// Create new pattern (only in input mode)
+				if a.mode == ModeInput {
+					a.showPatternForm(false, nil)
+				}
+				return nil
+			case 'e':
+				// Edit selected pattern (only in navigation mode)
+				if a.mode == ModeNavigation {
+					result := a.thoughtChain.GetSelectedResult()
+					if result != nil {
+						a.showPatternForm(true, result.Pattern)
+					}
+				}
+				return nil
+			case 'd':
+				// Delete selected pattern (only in navigation mode)
+				if a.mode == ModeNavigation {
+					result := a.thoughtChain.GetSelectedResult()
+					if result != nil {
+						a.deleteSelectedPattern(result.Pattern)
+					}
+				}
+				return nil
 			}
 		}
 		return event
@@ -485,6 +516,98 @@ func (a *App) toggleStats() {
 		a.pages.ShowPage("stats")
 		a.pages.SwitchToPage("stats")
 	}
+}
+
+// showPatternForm shows the pattern form for creating or editing
+func (a *App) showPatternForm(isEdit bool, pattern *models.Pattern) {
+	if isEdit {
+		a.patternForm.SetEditMode(pattern)
+	} else {
+		a.patternForm.SetCreateMode()
+	}
+	
+	a.showForm = true
+	a.pages.ShowPage("form")
+	a.pages.SwitchToPage("form")
+}
+
+// handlePatternSave handles pattern save from the form
+func (a *App) handlePatternSave(pattern *models.Pattern) {
+	ctx := context.Background()
+	
+	var err error
+	if pattern.ID == "" {
+		// Create new pattern
+		err = a.storage.SavePattern(ctx, pattern)
+	} else {
+		// Update existing pattern
+		err = a.storage.UpdatePattern(ctx, pattern)
+	}
+	
+	if err != nil {
+		a.output.SetStatus(fmt.Sprintf("Error saving pattern: %v", err), false)
+		return
+	}
+	
+	// Refresh pattern list
+	if err := a.loadData(ctx); err != nil {
+		a.output.SetStatus(fmt.Sprintf("Error reloading patterns: %v", err), false)
+		return
+	}
+	
+	// Update status bar
+	a.statusBar.SetPatternCount(len(a.patterns))
+	
+	// Return to main view
+	a.showForm = false
+	a.pages.HidePage("form")
+	a.pages.SwitchToPage("main")
+	a.app.SetFocus(a.input.view)
+	
+	a.output.SetStatus(fmt.Sprintf("Pattern '%s' saved successfully", pattern.Trigger), true)
+}
+
+// handlePatternCancel handles pattern form cancellation
+func (a *App) handlePatternCancel() {
+	a.showForm = false
+	a.pages.HidePage("form")
+	a.pages.SwitchToPage("main")
+	a.app.SetFocus(a.input.view)
+}
+
+// deleteSelectedPattern deletes the selected pattern after confirmation
+func (a *App) deleteSelectedPattern(pattern *models.Pattern) {
+	ctx := context.Background()
+	
+	// Show confirmation
+	a.output.SetOutput(fmt.Sprintf("Delete pattern '%s'?\n\nPress 'y' to confirm or any other key to cancel",
+		pattern.Trigger))
+	
+	// Set up a one-time input handler for confirmation
+	a.app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		// Restore original handler
+		a.setupKeyBindings()
+		
+		if event.Key() == tcell.KeyRune && (event.Rune() == 'y' || event.Rune() == 'Y') {
+			// Delete the pattern
+			if err := a.storage.DeletePattern(ctx, pattern.ID); err != nil {
+				a.output.SetStatus(fmt.Sprintf("Error deleting pattern: %v", err), false)
+				return nil
+			}
+			
+			// Refresh pattern list
+			if err := a.loadData(ctx); err != nil {
+				a.output.SetStatus(fmt.Sprintf("Error reloading patterns: %v", err), false)
+				return nil
+			}
+			
+			// Update status bar
+			a.statusBar.SetPatternCount(len(a.patterns))
+			a.output.SetStatus(fmt.Sprintf("Pattern '%s' deleted", pattern.Trigger), true)
+		}
+		
+		return event
+	})
 }
 
 // filterPatterns filters patterns based on query and filter type
