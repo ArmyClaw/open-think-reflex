@@ -10,11 +10,16 @@ import (
 
 // OutputView displays the AI generated content (Layer 2)
 type OutputView struct {
-	view     *tview.TextView
-	theme    *Theme
-	title    string
-	streaming bool
+	view        *tview.TextView
+	theme       *Theme
+	title       string
+	streaming   bool
+	loading     bool
+	stopLoading chan struct{}
 }
+
+// Spinner frames for loading animation
+var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
 // NewOutputView creates a new output view
 func NewOutputView(theme *Theme) *OutputView {
@@ -89,6 +94,49 @@ func (v *OutputView) StopStreaming() {
 // IsStreaming returns streaming state
 func (v *OutputView) IsStreaming() bool {
 	return v.streaming
+}
+
+// StartLoading begins loading animation with spinner
+func (v *OutputView) StartLoading(message string) {
+	if v.loading {
+		return
+	}
+	v.loading = true
+	v.stopLoading = make(chan struct{})
+	
+	go func() {
+		frameIdx := 0
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+		
+		for {
+			select {
+			case <-v.stopLoading:
+				return
+			case <-ticker.C:
+				frame := spinnerFrames[frameIdx%len(spinnerFrames)]
+				frameIdx++
+				v.view.SetText(fmt.Sprintf("[%s]%s %s[white]\n\nWaiting for AI response...", v.theme.Primary, frame, message))
+			}
+		}
+	}()
+}
+
+// StopLoading stops loading animation
+func (v *OutputView) StopLoading() {
+	if !v.loading {
+		return
+	}
+	v.loading = false
+	if v.stopLoading != nil {
+		close(v.stopLoading)
+		v.stopLoading = nil
+	}
+}
+
+// IsLoading returns loading state
+func (v *OutputView) IsLoading() bool {
+	return v.loading
 }
 
 // ShowTypingEffect displays text with typing effect (caller would handle timing)
