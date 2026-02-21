@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,6 +18,7 @@ type Storage struct {
 	db        *Database
 	stmtCache map[string]*sql.Stmt
 	mu        sync.RWMutex
+	queryCache *QueryCache  // Iter 49
 
 	// Concurrency statistics (Iter 47)
 	stats StorageStats
@@ -701,6 +703,66 @@ func (s *Storage) ResetStats() {
 	defer s.mu.Unlock()
 	s.stats = StorageStats{}
 }
+
+// BatchGetPatterns retrieves multiple patterns by IDs efficiently (Iter 52)
+func (s *Storage) BatchGetPatterns(ctx context.Context, ids []string) ([]*models.Pattern, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	// Build query with placeholders
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	query := "SELECT id, trigger, response, strength, threshold, decay_rate, decay_enabled, connections, created_at, updated_at, reinforcement_count, decay_count, last_used_at, tags, project, user_id, deleted_at FROM patterns WHERE id IN (" + strings.Join(placeholders, ",") + ") AND deleted_at IS NULL"
+
+	rows, err := s.db.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var patterns []*models.Pattern
+	for rows.Next() {
+		var p models.Pattern
+		var connections, tags sql.NullString
+		var lastUsedAt, deletedAt, createdAt, updatedAt sql.NullInt64
+		err := rows.Scan(
+			&p.ID, &p.Trigger, &p.Response, &p.Strength, &p.Threshold, &p.DecayRate, &p.DecayEnabled,
+			&connections, &createdAt, &updatedAt, &p.ReinforceCnt, &p.DecayCnt,
+			&lastUsedAt, &tags, &p.Project, &p.UserID, &deletedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if connections.Valid {
+			json.Unmarshal([]byte(connections.String), &p.Connections)
+		}
+		if tags.Valid {
+			json.Unmarshal([]byte(tags.String), &p.Tags)
+		}
+		p.CreatedAt = int64ToTime(createdAt)
+		p.UpdatedAt = int64ToTime(updatedAt)
+		p.LastUsedAt = int64ToTimePtr(lastUsedAt)
+		p.DeletedAt = int64ToTimePtr(deletedAt)
+		if err != nil {
+			return nil, err
+		}
+		patterns = append(patterns, &p)
+		
+		// Update cache if available
+		if s.queryCache != nil {
+			s.queryCache.Set(p.ID, &p)
+		}
+	}
+
+	return patterns, rows.Err()
+}
+
 
 // transaction implements contracts.Transaction
 type transaction struct {
