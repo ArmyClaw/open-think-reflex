@@ -522,6 +522,20 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 						return importSharedPattern(storage, c.String("code"))
 					},
 				},
+				{
+					Name:  "space",
+					Usage: "Share an entire space",
+					Flags: []cli.Flag{
+						&cli.StringFlag{
+							Name:     "id",
+							Required: true,
+							Usage:    "Space ID to share",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						return shareSpace(storage, c.String("id"))
+					},
+				},
 			},
 		},
 		{
@@ -1467,6 +1481,54 @@ func exportSkillsBatch(storage *sqlite.Storage, outputDir, spaceID string) error
 
 	fmt.Printf("Found %d patterns to export\n", len(patterns))
 	// TODO: Implement batch export
+
+	return nil
+}
+
+// shareSpace shares an entire space with all its patterns
+func shareSpace(storage *sqlite.Storage, spaceID string) error {
+	if spaceID == "" {
+		return fmt.Errorf("space ID required")
+	}
+
+	ctx := context.Background()
+
+	// Get space
+	space, err := storage.GetSpace(ctx, spaceID)
+	if err != nil {
+		return fmt.Errorf("space not found: %w", err)
+	}
+
+	// Get all patterns in space
+	patterns, err := storage.ListPatterns(ctx, contracts.ListOptions{SpaceID: spaceID, Limit: 10000})
+	if err != nil {
+		return fmt.Errorf("failed to list patterns: %w", err)
+	}
+
+	// Convert patterns to JSON
+	data, err := json.Marshal(struct {
+		Space    *models.Space    `json:"space"`
+		Patterns []models.Pattern `json:"patterns"`
+	}{
+		Space: space,
+		Patterns: func() []models.Pattern {
+			result := make([]models.Pattern, len(patterns))
+			for i, p := range patterns {
+				result[i] = *p
+			}
+			return result
+		}(),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+
+	// Encode as base64
+	encoded := base64.StdEncoding.EncodeToString(data)
+
+	fmt.Printf("Space '%s' shared with %d patterns!\n\n", space.Name, len(patterns))
+	fmt.Printf("Share code:\n%s\n\n", encoded)
+	fmt.Printf("Use: otr share import --code <code>\n")
 
 	return nil
 }
