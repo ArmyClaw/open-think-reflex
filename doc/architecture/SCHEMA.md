@@ -665,6 +665,7 @@ CREATE TABLE IF NOT EXISTS spaces (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT,
+    owner TEXT,
     is_default INTEGER NOT NULL DEFAULT 0,
     pattern_limit INTEGER NOT NULL DEFAULT 0,
     pattern_count INTEGER NOT NULL DEFAULT 0,

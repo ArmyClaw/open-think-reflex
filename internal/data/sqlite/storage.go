@@ -232,9 +232,9 @@ func (s *Storage) CreateSpace(ctx context.Context, space *models.Space) error {
 	space.UpdatedAt = now
 
 	_, err := s.db.db.ExecContext(ctx, `
-		INSERT OR REPLACE INTO spaces (id, name, description, is_default, pattern_limit, pattern_count, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`, space.ID, space.Name, space.Description, boolToInt(space.DefaultSpace),
+		INSERT OR REPLACE INTO spaces (id, name, description, owner, is_default, pattern_limit, pattern_count, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, space.ID, space.Name, space.Description, space.Owner, boolToInt(space.DefaultSpace),
 		space.PatternLimit, space.PatternCount, space.CreatedAt.Unix(), space.UpdatedAt.Unix())
 
 	return err
@@ -245,10 +245,10 @@ func (s *Storage) GetSpace(ctx context.Context, id string) (*models.Space, error
 	var space models.Space
 
 	err := s.db.db.QueryRowContext(ctx, `
-		SELECT id, name, description, is_default, pattern_limit, pattern_count, created_at, updated_at
+		SELECT id, name, description, owner, is_default, pattern_limit, pattern_count, created_at, updated_at
 		FROM spaces WHERE id = ?
 	`, id).Scan(
-		&space.ID, &space.Name, &space.Description, &space.DefaultSpace,
+		&space.ID, &space.Name, &space.Description, &space.Owner, &space.DefaultSpace,
 		&space.PatternLimit, &space.PatternCount, &space.CreatedAt, &space.UpdatedAt,
 	)
 
@@ -265,7 +265,7 @@ func (s *Storage) GetSpace(ctx context.Context, id string) (*models.Space, error
 // ListSpaces lists all spaces
 func (s *Storage) ListSpaces(ctx context.Context) ([]*models.Space, error) {
 	rows, err := s.db.db.QueryContext(ctx, `
-		SELECT id, name, description, is_default, pattern_limit, pattern_count, created_at, updated_at
+		SELECT id, name, description, owner, is_default, pattern_limit, pattern_count, created_at, updated_at
 		FROM spaces ORDER BY name
 	`)
 	if err != nil {
@@ -277,7 +277,7 @@ func (s *Storage) ListSpaces(ctx context.Context) ([]*models.Space, error) {
 	for rows.Next() {
 		var space models.Space
 		err := rows.Scan(
-			&space.ID, &space.Name, &space.Description, &space.DefaultSpace,
+			&space.ID, &space.Name, &space.Description, &space.Owner, &space.DefaultSpace,
 			&space.PatternLimit, &space.PatternCount, &space.CreatedAt, &space.UpdatedAt,
 		)
 		if err != nil {

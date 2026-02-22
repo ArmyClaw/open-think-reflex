@@ -10,6 +10,9 @@ type Space struct {
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
 
+	// Owner (for multi-user support in v2.0)
+	Owner string `json:"owner,omitempty" db:"owner"`
+
 	// Settings
 	DefaultSpace bool `json:"default_space" db:"is_default"`
 	PatternLimit int  `json:"pattern_limit" db:"pattern_limit"`
