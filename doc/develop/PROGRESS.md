@@ -4,12 +4,37 @@
 
 ---
 
-## 🚧 Phase 7: UI 改进 (2026-02-22 08:20)
+## 🚧 Phase 7: UI 改进 (2026-02-22 09:18)
 
 ### 项目状态
 - **版本**: v1.1.0 (开发中)
-- **当前迭代**: Iter 64 ✅ 完成
+- **当前迭代**: Iter 65 ✅ 完成
 - **阶段**: Phase 7 - UI 改进
+
+### Iter 65 完成 ✅ (2026-02-22 09:18)
+- History Panel - 查看历史交互记录
+- 新增 internal/ui/history.go:
+  - HistoryEntry 结构体: 单个历史记录
+  - HistoryPanel 组件: 显示历史记录列表
+  - 显示内容: 时间、输入、匹配的 Pattern
+  - 支持导航 [↑/↓]、查看详情 [Enter]、删除 [d]、清空 [c]
+  - 从 Pattern 数据自动生成历史记录
+  - 支持主题切换
+- 更新 internal/ui/app.go:
+  - 添加 historyPanel 字段
+  - 添加 showHistory 状态管理
+  - 添加 toggleHistory 函数
+  - 添加 handleHistorySelect 处理函数
+  - 添加 'y' 快捷键切换历史面板
+  - 匹配时自动记录到历史
+- 更新 internal/ui/help.go:
+  - 添加 'y' 快捷键说明到帮助文档
+  - 更新 ShortcutBar 显示
+- 编译通过，测试通过
+- 已推送到 GitHub
+
+### 下一步
+- Iter 66: 待规划
 
 ### Iter 64 完成 ✅ (2026-02-22 08:20)
 - Settings 面板 - 应用设置显示
