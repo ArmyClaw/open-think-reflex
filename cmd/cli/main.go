@@ -153,16 +153,19 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 				{
 					Name:  "create",
 					Usage: "Create a new pattern",
+					Aliases: []string{"add", "new"},
 					Flags: []cli.Flag{
 						&cli.StringFlag{
-							Name:     "trigger",
+							Name:    "trigger",
+							Aliases: []string{"t"},
 							Required: true,
-							Usage:    "Pattern trigger",
+							Usage:   "Pattern trigger",
 						},
 						&cli.StringFlag{
-							Name:     "response",
+							Name:    "response",
+							Aliases: []string{"r"},
 							Required: true,
-							Usage:    "Pattern response",
+							Usage:   "Pattern response",
 						},
 						&cli.StringFlag{
 							Name:  "project",
@@ -170,6 +173,7 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 						},
 						&cli.StringFlag{
 							Name:  "tags",
+							Aliases: []string{"tag"},
 							Usage: "Comma-separated tags",
 						},
 					},
@@ -422,14 +426,17 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 				{
 					Name:  "create",
 					Usage: "Create a new note",
+					Aliases: []string{"add", "new"},
 					Flags: []cli.Flag{
 						&cli.StringFlag{
 							Name:     "title",
+							Aliases:  []string{"t"},
 							Required: true,
 							Usage:    "Note title",
 						},
 						&cli.StringFlag{
 							Name:     "content",
+							Aliases:  []string{"c"},
 							Required: true,
 							Usage:    "Note content",
 						},
