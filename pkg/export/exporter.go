@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ArmyClaw/open-think-reflex/pkg/models"
+	"gopkg.in/yaml.v3"
 )
 
 // Exporter handles exporting patterns to various formats.
@@ -78,6 +79,58 @@ func (e *Exporter) ExportSpaceToJSON(ctx context.Context, space *models.Space, p
 	}
 
 	data, err := json.MarshalIndent(exportData, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal export data: %w", err)
+	}
+
+	if err := os.WriteFile(filepath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	return nil
+}
+
+// ExportToYAML exports all patterns to a YAML file.
+func (e *Exporter) ExportToYAML(ctx context.Context, patterns []*models.Pattern, filepath string) error {
+	patternValues := make([]models.Pattern, len(patterns))
+	for i, p := range patterns {
+		patternValues[i] = *p
+	}
+
+	exportData := ExportData{
+		Version:     "1.0",
+		ExportedAt:  time.Now(),
+		PatternCount: len(patternValues),
+		Patterns:    patternValues,
+	}
+
+	data, err := yaml.Marshal(exportData)
+	if err != nil {
+		return fmt.Errorf("failed to marshal export data: %w", err)
+	}
+
+	if err := os.WriteFile(filepath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	return nil
+}
+
+// ExportSpaceToYAML exports a Space with patterns to a YAML file.
+func (e *Exporter) ExportSpaceToYAML(ctx context.Context, space *models.Space, patterns []*models.Pattern, filepath string) error {
+	patternValues := make([]models.Pattern, len(patterns))
+	for i, p := range patterns {
+		patternValues[i] = *p
+	}
+
+	exportData := SpaceExportData{
+		Version:    "2.0",
+		ExportedAt: time.Now(),
+		Space:      space,
+		Patterns:   patternValues,
+	}
+
+	data, err := yaml.Marshal(exportData)
 	if err != nil {
 		return fmt.Errorf("failed to marshal export data: %w", err)
 	}
