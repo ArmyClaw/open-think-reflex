@@ -293,6 +293,43 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 						return commands.SetDefaultSpace(storage, c.Args().First())
 					},
 				},
+				{
+					Name:  "export",
+					Usage: "Export a space to a file",
+					Flags: []cli.Flag{
+						&cli.StringFlag{
+							Name:     "id",
+							Required: true,
+							Usage:    "Space ID to export",
+						},
+						&cli.StringFlag{
+							Name:     "output",
+							Required: true,
+							Usage:    "Output file path",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						return exportSpace(storage, c.String("id"), c.String("output"))
+					},
+				},
+				{
+					Name:  "import",
+					Usage: "Import a space from a file",
+					Flags: []cli.Flag{
+						&cli.StringFlag{
+							Name:     "input",
+							Required: true,
+							Usage:    "Input file path",
+						},
+						&cli.BoolFlag{
+							Name:  "force",
+							Usage: "Overwrite existing patterns",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						return importSpace(storage, c.String("input"), c.Bool("force"))
+					},
+				},
 			},
 		},
 		{
@@ -570,6 +607,85 @@ func decayPatterns(storage *sqlite.Storage) error {
 	}
 
 	fmt.Printf("Total patterns decayed: %d\n", decayedCount)
+	return nil
+}
+
+func exportSpace(storage *sqlite.Storage, spaceID, outputPath string) error {
+	if spaceID == "" {
+		return fmt.Errorf("space ID required")
+	}
+	if outputPath == "" {
+		return fmt.Errorf("output path required")
+	}
+
+	ctx := context.Background()
+
+	// Get space
+	space, err := storage.GetSpace(ctx, spaceID)
+	if err != nil {
+		return fmt.Errorf("space not found: %w", err)
+	}
+
+	// Get patterns in this space
+	patterns, err := storage.ListPatterns(ctx, contracts.ListOptions{SpaceID: spaceID, Limit: 10000})
+	if err != nil {
+		return fmt.Errorf("failed to list patterns: %w", err)
+	}
+
+	// Export
+	exporter := export.NewExporter()
+	if err := exporter.ExportSpaceToJSON(ctx, space, patterns, outputPath); err != nil {
+		return fmt.Errorf("failed to export: %w", err)
+	}
+
+	fmt.Printf("Space '%s' exported to '%s' (%d patterns)\n", space.Name, outputPath, len(patterns))
+	return nil
+}
+
+func importSpace(storage *sqlite.Storage, inputPath string, force bool) error {
+	if inputPath == "" {
+		return fmt.Errorf("input path required")
+	}
+
+	ctx := context.Background()
+
+	// Import
+	importer := export.NewImporter()
+	data, err := importer.ImportSpaceFromJSON(ctx, inputPath)
+	if err != nil {
+		return fmt.Errorf("failed to import: %w", err)
+	}
+
+	// Create or get space
+	space := data.Space
+	if space == nil {
+		return fmt.Errorf("invalid import file: no space data")
+	}
+
+	// Check if space exists
+	existingSpace, err := storage.GetSpace(ctx, space.ID)
+	if err != nil {
+		// Space doesn't exist, create it
+		if err := storage.CreateSpace(ctx, space); err != nil {
+			return fmt.Errorf("failed to create space: %w", err)
+		}
+		fmt.Printf("Created space: %s\n", space.Name)
+	} else if !force {
+		return fmt.Errorf("space '%s' already exists (use --force to overwrite)", existingSpace.Name)
+	}
+
+	// Import patterns
+	importedCount := 0
+	for _, pattern := range data.Patterns {
+		pattern.SpaceID = space.ID // Ensure pattern belongs to this space
+		if err := storage.SavePattern(ctx, &pattern); err != nil {
+			fmt.Printf("Warning: failed to import pattern %s: %v\n", pattern.Trigger, err)
+			continue
+		}
+		importedCount++
+	}
+
+	fmt.Printf("Imported %d patterns to space '%s'\n", importedCount, space.Name)
 	return nil
 }
 

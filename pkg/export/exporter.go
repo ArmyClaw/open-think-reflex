@@ -27,6 +27,14 @@ type ExportData struct {
 	Patterns    []models.Pattern `json:"patterns"`
 }
 
+// SpaceExportData represents the structure of an exported Space file.
+type SpaceExportData struct {
+	Version    string            `json:"version"`
+	ExportedAt time.Time        `json:"exported_at"`
+	Space      *models.Space    `json:"space"`
+	Patterns   []models.Pattern `json:"patterns"`
+}
+
 // ExportToJSON exports all patterns to a JSON file.
 func (e *Exporter) ExportToJSON(ctx context.Context, patterns []*models.Pattern, filepath string) error {
 	// Convert pointers to values for JSON serialization
@@ -54,12 +62,47 @@ func (e *Exporter) ExportToJSON(ctx context.Context, patterns []*models.Pattern,
 	return nil
 }
 
+// ExportSpaceToJSON exports a Space with its patterns to a JSON file.
+func (e *Exporter) ExportSpaceToJSON(ctx context.Context, space *models.Space, patterns []*models.Pattern, filepath string) error {
+	// Convert pointers to values for JSON serialization
+	patternValues := make([]models.Pattern, len(patterns))
+	for i, p := range patterns {
+		patternValues[i] = *p
+	}
+
+	exportData := SpaceExportData{
+		Version:    "2.0",
+		ExportedAt: time.Now(),
+		Space:      space,
+		Patterns:   patternValues,
+	}
+
+	data, err := json.MarshalIndent(exportData, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal export data: %w", err)
+	}
+
+	if err := os.WriteFile(filepath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	return nil
+}
+
 // ImportData represents the structure of an imported data file.
 type ImportData struct {
 	Version     string            `json:"version"`
 	ExportedAt  time.Time         `json:"exported_at"`
 	PatternCount int              `json:"pattern_count"`
 	Patterns    []models.Pattern `json:"patterns"`
+}
+
+// SpaceImportData represents the structure of an imported Space file.
+type SpaceImportData struct {
+	Version  string             `json:"version"`
+	ExportedAt time.Time        `json:"exported_at"`
+	Space    *models.Space     `json:"space"`
+	Patterns []models.Pattern  `json:"patterns"`
 }
 
 // Importer handles importing patterns from various formats.
@@ -78,6 +121,26 @@ func (i *Importer) ImportFromJSON(ctx context.Context, filepath string) (*Import
 	}
 
 	var importData ImportData
+	if err := json.Unmarshal(data, &importData); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal import data: %w", err)
+	}
+
+	// Validate import data
+	if importData.Patterns == nil {
+		importData.Patterns = make([]models.Pattern, 0)
+	}
+
+	return &importData, nil
+}
+
+// ImportSpaceFromJSON imports a Space with patterns from a JSON file.
+func (i *Importer) ImportSpaceFromJSON(ctx context.Context, filepath string) (*SpaceImportData, error) {
+	data, err := os.ReadFile(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	var importData SpaceImportData
 	if err := json.Unmarshal(data, &importData); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal import data: %w", err)
 	}
