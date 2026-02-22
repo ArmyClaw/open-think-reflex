@@ -334,6 +334,86 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 			},
 		},
 		{
+			Name:  "note",
+			Usage: "Manage notes and thoughts",
+			Subcommands: []*cli.Command{
+				{
+					Name:  "list",
+					Usage: "List all notes",
+					Flags: []cli.Flag{
+						&cli.StringFlag{
+							Name:  "space",
+							Usage: "Filter by space ID",
+						},
+						&cli.StringFlag{
+							Name:  "category",
+							Usage: "Filter by category (thought/idea/todo/memory/question/note)",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						return listNotes(storage, c.String("space"), c.String("category"))
+					},
+				},
+				{
+					Name:  "create",
+					Usage: "Create a new note",
+					Flags: []cli.Flag{
+						&cli.StringFlag{
+							Name:     "title",
+							Required: true,
+							Usage:    "Note title",
+						},
+						&cli.StringFlag{
+							Name:     "content",
+							Required: true,
+							Usage:    "Note content",
+						},
+						&cli.StringFlag{
+							Name:  "category",
+							Usage: "Note category",
+						},
+						&cli.StringFlag{
+							Name:  "space",
+							Usage: "Space ID",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						return createNote(storage, c.String("title"), c.String("content"), c.String("category"), c.String("space"))
+					},
+				},
+				{
+					Name:      "show",
+					Usage:     "Show note details",
+					ArgsUsage: "<note_id>",
+					Action: func(c *cli.Context) error {
+						return showNote(storage, c.Args().First())
+					},
+				},
+				{
+					Name:      "delete",
+					Usage:     "Delete a note",
+					ArgsUsage: "<note_id>",
+					Action: func(c *cli.Context) error {
+						return deleteNote(storage, c.Args().First())
+					},
+				},
+				{
+					Name:  "search",
+					Usage: "Search notes",
+					Flags: []cli.Flag{
+						&cli.StringFlag{
+							Name:     "query",
+							Required: true,
+							Usage:    "Search query",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						return searchNotes(storage, c.String("query"))
+					},
+				},
+			},
+		},
+		{
 			Name:  "version",
 			Usage: "Show version information",
 			Action: func(c *cli.Context) error {
@@ -730,6 +810,133 @@ func importSpace(storage *sqlite.Storage, inputPath string, force bool) error {
 	}
 
 	fmt.Printf("Imported %d patterns to space '%s'\n", importedCount, space.Name)
+	return nil
+}
+
+func listNotes(storage *sqlite.Storage, spaceID, category string) error {
+	ctx := context.Background()
+
+	opts := contracts.ListOptions{
+		SpaceID: spaceID,
+	}
+
+	notes, err := storage.ListNotes(ctx, opts)
+	if err != nil {
+		return fmt.Errorf("failed to list notes: %w", err)
+	}
+
+	// Filter by category in memory if specified
+	if category != "" {
+		var filtered []*models.Note
+		for _, n := range notes {
+			if n.Category == category {
+				filtered = append(filtered, n)
+			}
+		}
+		notes = filtered
+	}
+
+	if len(notes) == 0 {
+		fmt.Println("No notes found")
+		return nil
+	}
+
+	fmt.Printf("Found %d notes:\n\n", len(notes))
+	for _, n := range notes {
+		preview := n.Content
+		if len(preview) > 50 {
+			preview = preview[:50] + "..."
+		}
+		fmt.Printf("  %s  %s (%s)\n", n.ID[:min(8, len(n.ID))], n.Title, n.Category)
+		fmt.Printf("      %s\n\n", preview)
+	}
+
+	return nil
+}
+
+func createNote(storage *sqlite.Storage, title, content, category, spaceID string) error {
+	ctx := context.Background()
+
+	note := &models.Note{
+		Title:    title,
+		Content:  content,
+		Category: category,
+		SpaceID:  spaceID,
+	}
+
+	if note.SpaceID == "" {
+		note.SpaceID = "global"
+	}
+	if note.Category == "" {
+		note.Category = "note"
+	}
+
+	if err := storage.SaveNote(ctx, note); err != nil {
+		return fmt.Errorf("failed to create note: %w", err)
+	}
+
+	fmt.Printf("Note created: %s\n", note.ID)
+	return nil
+}
+
+func showNote(storage *sqlite.Storage, noteID string) error {
+	if noteID == "" {
+		return fmt.Errorf("note ID required")
+	}
+
+	ctx := context.Background()
+	note, err := storage.GetNote(ctx, noteID)
+	if err != nil {
+		return fmt.Errorf("note not found: %w", err)
+	}
+
+	fmt.Printf("Note: %s\n", note.ID)
+	fmt.Printf("  Title: %s\n", note.Title)
+	fmt.Printf("  Category: %s\n", note.Category)
+	fmt.Printf("  Space: %s\n", note.SpaceID)
+	fmt.Printf("  Words: %d\n", note.WordCount)
+	fmt.Printf("  Created: %s\n", note.CreatedAt.Format("2006-01-02 15:04:05"))
+	fmt.Printf("  Updated: %s\n", note.UpdatedAt.Format("2006-01-02 15:04:05"))
+	fmt.Printf("\nContent:\n%s\n", note.Content)
+
+	return nil
+}
+
+func deleteNote(storage *sqlite.Storage, noteID string) error {
+	if noteID == "" {
+		return fmt.Errorf("note ID required")
+	}
+
+	ctx := context.Background()
+	if err := storage.DeleteNote(ctx, noteID); err != nil {
+		return fmt.Errorf("failed to delete note: %w", err)
+	}
+
+	fmt.Printf("Note deleted: %s\n", noteID)
+	return nil
+}
+
+func searchNotes(storage *sqlite.Storage, query string) error {
+	if query == "" {
+		return fmt.Errorf("search query required")
+	}
+
+	ctx := context.Background()
+	notes, err := storage.SearchNotes(ctx, query, contracts.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to search notes: %w", err)
+	}
+
+	if len(notes) == 0 {
+		fmt.Println("No notes found")
+		return nil
+	}
+
+	fmt.Printf("Found %d matching notes:\n\n", len(notes))
+	for _, n := range notes {
+		fmt.Printf("  %s  %s (%s)\n", n.ID[:min(8, len(n.ID))], n.Title, n.Category)
+	}
+
 	return nil
 }
 
