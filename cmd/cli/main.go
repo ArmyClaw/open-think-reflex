@@ -406,9 +406,13 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 							Name:  "category",
 							Usage: "Filter by category (thought/idea/todo/memory/question/note)",
 						},
+						&cli.BoolFlag{
+							Name:  "recent",
+							Usage: "Show only recent notes (last 10)",
+						},
 					},
 					Action: func(c *cli.Context) error {
-						return listNotes(storage, c.String("space"), c.String("category"))
+						return listNotes(storage, c.String("space"), c.String("category"), c.Bool("recent"))
 					},
 				},
 				{
@@ -1207,11 +1211,12 @@ func importSpace(storage *sqlite.Storage, inputPath string, force bool) error {
 	return nil
 }
 
-func listNotes(storage *sqlite.Storage, spaceID, category string) error {
+func listNotes(storage *sqlite.Storage, spaceID, category string, recent bool) error {
 	ctx := context.Background()
 
 	opts := contracts.ListOptions{
 		SpaceID: spaceID,
+		Limit:   10, // Default limit
 	}
 
 	notes, err := storage.ListNotes(ctx, opts)
@@ -1235,7 +1240,11 @@ func listNotes(storage *sqlite.Storage, spaceID, category string) error {
 		return nil
 	}
 
-	fmt.Printf("Found %d notes:\n\n", len(notes))
+	header := "Found %d notes:"
+	if recent {
+		header = "Recent %d notes:"
+	}
+	fmt.Printf(header+"\n\n", len(notes))
 	for _, n := range notes {
 		preview := n.Content
 		if len(preview) > 50 {
