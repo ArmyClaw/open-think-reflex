@@ -161,6 +161,22 @@ func (d *Database) Migrate(ctx context.Context) error {
 			user_id TEXT
 		)`,
 
+		// Notes table (Phase 10: 思绪整理)
+		`CREATE TABLE IF NOT EXISTS notes (
+			id TEXT PRIMARY KEY,
+			title TEXT NOT NULL,
+			content TEXT NOT NULL,
+			space_id TEXT DEFAULT 'global',
+			tags TEXT,
+			is_pinned INTEGER NOT NULL DEFAULT 0,
+			category TEXT DEFAULT 'note',
+			word_count INTEGER NOT NULL DEFAULT 0,
+			char_count INTEGER NOT NULL DEFAULT 0,
+			last_viewed_at INTEGER,
+			created_at INTEGER NOT NULL,
+			updated_at INTEGER NOT NULL
+		)`,
+
 		// Indices - Basic
 		`CREATE INDEX IF NOT EXISTS idx_patterns_trigger ON patterns(trigger)`,
 		`CREATE INDEX IF NOT EXISTS idx_patterns_strength ON patterns(strength)`,
@@ -177,6 +193,13 @@ func (d *Database) Migrate(ctx context.Context) error {
 		`CREATE INDEX IF NOT EXISTS idx_patterns_strength_threshold ON patterns(strength, threshold)`,
 		`CREATE INDEX IF NOT EXISTS idx_patterns_decay_enabled ON patterns(decay_enabled)`,
 		`CREATE INDEX IF NOT EXISTS idx_patterns_space_id ON patterns(space_id)`,
+
+		// Notes indices (Phase 10)
+		`CREATE INDEX IF NOT EXISTS idx_notes_space_id ON notes(space_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_notes_category ON notes(category)`,
+		`CREATE INDEX IF NOT EXISTS idx_notes_is_pinned ON notes(is_pinned)`,
+		`CREATE INDEX IF NOT EXISTS idx_notes_created_at ON notes(created_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_notes_updated_at ON notes(updated_at)`,
 	}
 
 	for _, migration := range migrations {
