@@ -345,6 +345,13 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 					},
 				},
 				{
+					Name:  "stats",
+					Usage: "Show space statistics",
+					Action: func(c *cli.Context) error {
+						return showSpaceStats(storage)
+					},
+				},
+				{
 					Name:  "export",
 					Usage: "Export a space to a file",
 					Flags: []cli.Flag{
@@ -1940,6 +1947,51 @@ func runDiagnostics(storage *sqlite.Storage) error {
 	} else {
 		fmt.Printf("Found %d issues. Run 'otr pattern stats' for details.\n", issues)
 	}
+
+	return nil
+}
+
+// showSpaceStats displays space statistics
+func showSpaceStats(storage *sqlite.Storage) error {
+	ctx := context.Background()
+
+	spaces, err := storage.ListSpaces(ctx)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("📊 Space Statistics")
+	fmt.Println("==================")
+	fmt.Println()
+
+	defaultSpace, err := storage.GetDefaultSpace(ctx)
+	if err != nil {
+		defaultSpace = nil
+	}
+
+	for _, space := range spaces {
+		// Get pattern count for this space
+		patterns, err := storage.ListPatterns(ctx, contracts.ListOptions{SpaceID: space.ID, Limit: 10000})
+		if err != nil {
+			continue
+		}
+
+		isDefault := ""
+		if defaultSpace != nil && defaultSpace.ID == space.ID {
+			isDefault = " (default)"
+		}
+
+		fmt.Printf("📁 %s%s\n", space.Name, isDefault)
+		fmt.Printf("   ID: %s\n", space.ID)
+		fmt.Printf("   Patterns: %d\n", len(patterns))
+
+		if space.Description != "" {
+			fmt.Printf("   Description: %s\n", space.Description)
+		}
+		fmt.Println()
+	}
+
+	fmt.Printf("Total: %d spaces\n", len(spaces))
 
 	return nil
 }
