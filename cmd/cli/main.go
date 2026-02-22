@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
@@ -479,6 +481,40 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 			},
 			Action: func(c *cli.Context) error {
 				return createBackup(storage, c.String("output"), c.String("format"), c.Bool("include-notes"))
+			},
+		},
+		{
+			Name:  "share",
+			Usage: "Share a pattern",
+			Subcommands: []*cli.Command{
+				{
+					Name:  "create",
+					Usage: "Create a shareable link for a pattern",
+					Flags: []cli.Flag{
+						&cli.StringFlag{
+							Name:     "id",
+							Required: true,
+							Usage:    "Pattern ID to share",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						return sharePattern(storage, c.String("id"))
+					},
+				},
+				{
+					Name:  "import",
+					Usage: "Import a shared pattern",
+					Flags: []cli.Flag{
+						&cli.StringFlag{
+							Name:     "code",
+							Required: true,
+							Usage:    "Share code",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						return importSharedPattern(storage, c.String("code"))
+					},
+				},
 			},
 		},
 		{
@@ -1220,6 +1256,79 @@ func createBackup(storage *sqlite.Storage, outputPath, format string, includeNot
 		fmt.Printf("Backup completed: %s (%d patterns)\n", outputPath, len(patterns))
 	}
 
+	return nil
+}
+
+// sharePattern generates a shareable code for a pattern
+func sharePattern(storage *sqlite.Storage, patternID string) error {
+	if patternID == "" {
+		return fmt.Errorf("pattern ID required")
+	}
+
+	ctx := context.Background()
+
+	// Get pattern
+	pattern, err := storage.GetPattern(ctx, patternID)
+	if err != nil {
+		return fmt.Errorf("pattern not found: %w", err)
+	}
+
+	// Get space name
+	spaceName := ""
+	if pattern.SpaceID != "" {
+		space, err := storage.GetSpace(ctx, pattern.SpaceID)
+		if err == nil {
+			spaceName = space.Name
+		}
+	}
+
+	// Convert to skill
+	skill := skills.ConvertPatternToSkill(pattern, spaceName)
+
+	// Marshal to JSON
+	data, err := json.Marshal(skill)
+	if err != nil {
+		return fmt.Errorf("failed to marshal skill: %w", err)
+	}
+
+	// Encode as base64
+	encoded := base64.StdEncoding.EncodeToString(data)
+
+	fmt.Printf("Pattern shared! Share code:\n%s\n", encoded)
+	fmt.Printf("\nUse: otr share import --code <code>\n")
+
+	return nil
+}
+
+// importSharedPattern imports a pattern from a share code
+func importSharedPattern(storage *sqlite.Storage, code string) error {
+	if code == "" {
+		return fmt.Errorf("share code required")
+	}
+
+	// Decode base64
+	data, err := base64.StdEncoding.DecodeString(code)
+	if err != nil {
+		return fmt.Errorf("invalid share code: %w", err)
+	}
+
+	// Unmarshal JSON
+	var skill skills.Skill
+	if err := json.Unmarshal(data, &skill); err != nil {
+		return fmt.Errorf("invalid share code format: %w", err)
+	}
+
+	// Convert to pattern
+	pattern := skills.ConvertSkillToPattern(&skill)
+
+	ctx := context.Background()
+
+	// Save pattern
+	if err := storage.SavePattern(ctx, pattern); err != nil {
+		return fmt.Errorf("failed to save pattern: %w", err)
+	}
+
+	fmt.Printf("Imported pattern: %s\n", pattern.Trigger)
 	return nil
 }
 
