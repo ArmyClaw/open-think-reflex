@@ -146,9 +146,13 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 							Name:  "project",
 							Usage: "Project name",
 						},
+						&cli.StringFlag{
+							Name:  "tags",
+							Usage: "Comma-separated tags",
+						},
 					},
 					Action: func(c *cli.Context) error {
-						return createPattern(storage, c.String("trigger"), c.String("response"), c.String("project"))
+						return createPattern(storage, c.String("trigger"), c.String("response"), c.String("project"), c.String("tags"))
 					},
 				},
 				{
@@ -704,10 +708,19 @@ func listPatterns(storage *sqlite.Storage, tagFilter, spaceFilter string) error 
 	return nil
 }
 
-func createPattern(storage *sqlite.Storage, trigger, response, project string) error {
+func createPattern(storage *sqlite.Storage, trigger, response, project, tagsStr string) error {
 	ctx := context.Background()
 	pattern := models.NewPattern(trigger, response)
 	pattern.Project = project
+
+	// Parse tags
+	if tagsStr != "" {
+		tags := strings.Split(tagsStr, ",")
+		for i := range tags {
+			tags[i] = strings.TrimSpace(tags[i])
+		}
+		pattern.Tags = tags
+	}
 
 	if err := storage.SavePattern(ctx, pattern); err != nil {
 		return err
