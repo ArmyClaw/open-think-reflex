@@ -558,6 +558,7 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 		{
 			Name:  "backup",
 			Usage: "Backup data to a file",
+			Aliases: []string{"save"},
 			Flags: []cli.Flag{
 				&cli.StringFlag{
 					Name:     "output",
@@ -588,6 +589,7 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 		{
 			Name:  "share",
 			Usage: "Share a pattern",
+			Aliases: []string{"pub"},
 			Subcommands: []*cli.Command{
 				{
 					Name:  "list",
