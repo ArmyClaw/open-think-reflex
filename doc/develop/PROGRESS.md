@@ -1,6 +1,6 @@
 # Open-Think-Reflex Progress Tracker
 
-> **Last Updated**: 2026-02-22 13:05
+> **Last Updated**: 2026-02-22 13:15
 
 ---
 
@@ -8,8 +8,22 @@
 
 ### 项目状态
 - **版本**: v2.0 (开发中)
-- **当前迭代**: Iter 80 ✅ 完成
+- **当前迭代**: Iter 81 ✅ 完成
 - **阶段**: Phase 10 - 思绪整理
+
+### Iter 81 完成 ✅ (2026-02-22 13:15)
+- Note CRUD 存储操作
+- 更新 pkg/contracts/storage.go:
+  - 添加 Note 相关接口: SaveNote, GetNote, ListNotes, DeleteNote, UpdateNote, SearchNotes
+- 更新 internal/data/sqlite/storage.go:
+  - 实现 SaveNote: 创建或更新笔记
+  - 实现 GetNote: 获取单个笔记
+  - 实现 ListNotes: 列出笔记 (支持 SpaceID/Category 过滤)
+  - 实现 DeleteNote: 删除笔记
+  - 实现 UpdateNote: 更新笔记
+  - 实现 SearchNotes: 全文搜索标题和内容
+- 编译通过，测试通过
+- 已推送到 GitHub
 
 ### Iter 80 完成 ✅ (2026-02-22 13:05)
 - Note 数据模型
@@ -27,8 +41,8 @@
 - 已推送到 GitHub
 
 ### 下一步
-- Iter 81: 待规划
-- Note CRUD 操作
+- Iter 82: 待规划
+- Note CLI 命令
 
 ---
 
