@@ -977,11 +977,12 @@ func (s *Storage) ListNotes(ctx context.Context, opts contracts.ListOptions) ([]
 		var note models.Note
 		var tagsJSON []byte
 		var lastViewed sql.NullInt64
+		var createdAt, updatedAt sql.NullInt64
 
 		err := rows.Scan(
 			&note.ID, &note.Title, &note.Content, &note.SpaceID, &tagsJSON,
 			&note.IsPinned, &note.Category, &note.WordCount, &note.CharCount, &lastViewed,
-			&note.CreatedAt, &note.UpdatedAt)
+			&createdAt, &updatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -991,6 +992,8 @@ func (s *Storage) ListNotes(ctx context.Context, opts contracts.ListOptions) ([]
 			t := time.Unix(lastViewed.Int64, 0)
 			note.LastViewed = &t
 		}
+		note.CreatedAt = time.Unix(createdAt.Int64, 0)
+		note.UpdatedAt = time.Unix(updatedAt.Int64, 0)
 
 		notes = append(notes, &note)
 	}
