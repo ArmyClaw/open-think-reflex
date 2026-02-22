@@ -1,6 +1,6 @@
 # Open-Think-Reflex Progress Tracker
 
-> **Last Updated**: 2026-02-22 13:15
+> **Last Updated**: 2026-02-22 13:30
 
 ---
 
@@ -8,8 +8,20 @@
 
 ### 项目状态
 - **版本**: v2.0 (开发中)
-- **当前迭代**: Iter 81 ✅ 完成
+- **当前迭代**: Iter 82 ✅ 完成
 - **阶段**: Phase 10 - 思绪整理
+
+### Iter 82 完成 ✅ (2026-02-22 13:30)
+- Note CLI 命令
+- 更新 cmd/cli/main.go:
+  - 添加 note 命令组 (otr note)
+  - note list: 列出笔记 (--space, --category 过滤)
+  - note create: 创建笔记 (--title, --content, --category, --space)
+  - note show: 显示笔记详情
+  - note delete: 删除笔记
+  - note search: 搜索笔记 (--query)
+- 编译通过，测试通过
+- 已推送到 GitHub
 
 ### Iter 81 完成 ✅ (2026-02-22 13:15)
 - Note CRUD 存储操作
@@ -41,8 +53,8 @@
 - 已推送到 GitHub
 
 ### 下一步
-- Iter 82: 待规划
-- Note CLI 命令
+- Iter 83: 待规划
+- Phase 10 集成测试
 
 ---
 
