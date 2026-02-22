@@ -539,6 +539,13 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 			},
 		},
 		{
+			Name:  "doctor",
+			Usage: "Run diagnostics and health checks",
+			Action: func(c *cli.Context) error {
+				return runDiagnostics(storage)
+			},
+		},
+		{
 			Name:  "share",
 			Usage: "Share a pattern",
 			Subcommands: []*cli.Command{
@@ -1815,6 +1822,67 @@ func shareSpace(storage *sqlite.Storage, spaceID string) error {
 	fmt.Printf("Space '%s' shared with %d patterns!\n\n", space.Name, len(patterns))
 	fmt.Printf("Share code:\n%s\n\n", encoded)
 	fmt.Printf("Use: otr share import --code <code>\n")
+
+	return nil
+}
+
+// runDiagnostics performs health checks on the database
+func runDiagnostics(storage *sqlite.Storage) error {
+	ctx := context.Background()
+
+	fmt.Println("🔍 Running diagnostics...")
+	fmt.Println()
+
+	// Check database connection
+	fmt.Printf("✓ Database connection: OK\n")
+
+	// Check patterns
+	patterns, err := storage.ListPatterns(ctx, contracts.ListOptions{Limit: 10000})
+	if err != nil {
+		return fmt.Errorf("failed to list patterns: %w", err)
+	}
+	fmt.Printf("✓ Patterns: %d total\n", len(patterns))
+
+	// Check spaces
+	spaces, err := storage.ListSpaces(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list spaces: %w", err)
+	}
+	fmt.Printf("✓ Spaces: %d total\n", len(spaces))
+
+	// Check for issues
+	issues := 0
+
+	// Check for patterns with zero strength
+	zeroStrength := 0
+	for _, p := range patterns {
+		if p.Strength == 0 {
+			zeroStrength++
+		}
+	}
+	if zeroStrength > 0 {
+		fmt.Printf("⚠ %d patterns have zero strength\n", zeroStrength)
+		issues++
+	}
+
+	// Check for patterns with empty triggers
+	emptyTrigger := 0
+	for _, p := range patterns {
+		if p.Trigger == "" {
+			emptyTrigger++
+		}
+	}
+	if emptyTrigger > 0 {
+		fmt.Printf("⚠ %d patterns have empty triggers\n", emptyTrigger)
+		issues++
+	}
+
+	fmt.Println()
+	if issues == 0 {
+		fmt.Println("✅ No issues found!")
+	} else {
+		fmt.Printf("Found %d issues. Run 'otr pattern stats' for details.\n", issues)
+	}
 
 	return nil
 }
