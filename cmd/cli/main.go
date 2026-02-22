@@ -114,8 +114,18 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 				{
 					Name:  "list",
 					Usage: "List all patterns",
+					Flags: []cli.Flag{
+						&cli.StringFlag{
+							Name:  "tag",
+							Usage: "Filter by tag",
+						},
+						&cli.StringFlag{
+							Name:  "space",
+							Usage: "Filter by space ID",
+						},
+					},
 					Action: func(c *cli.Context) error {
-						return listPatterns(storage)
+						return listPatterns(storage, c.String("tag"), c.String("space"))
 					},
 				},
 				{
@@ -640,11 +650,34 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 	}
 }
 
-func listPatterns(storage *sqlite.Storage) error {
+func listPatterns(storage *sqlite.Storage, tagFilter, spaceFilter string) error {
 	ctx := context.Background()
-	patterns, err := storage.ListPatterns(ctx, contracts.ListOptions{Limit: 100})
+	
+	opts := contracts.ListOptions{Limit: 100}
+	if spaceFilter != "" {
+		opts.SpaceID = spaceFilter
+	}
+	if tagFilter != "" {
+		opts.Tags = []string{tagFilter}
+	}
+	
+	patterns, err := storage.ListPatterns(ctx, opts)
 	if err != nil {
 		return err
+	}
+
+	// Additional tag filtering if needed
+	if tagFilter != "" {
+		var filtered []*models.Pattern
+		for _, p := range patterns {
+			for _, t := range p.Tags {
+				if t == tagFilter {
+					filtered = append(filtered, p)
+					break
+				}
+			}
+		}
+		patterns = filtered
 	}
 
 	if len(patterns) == 0 {
@@ -654,7 +687,11 @@ func listPatterns(storage *sqlite.Storage) error {
 
 	fmt.Printf("Found %d patterns:\n\n", len(patterns))
 	for _, p := range patterns {
-		fmt.Printf("  %s  %s (strength: %.1f)\n", p.ID[:8], p.Trigger, p.Strength)
+		tagStr := ""
+		if len(p.Tags) > 0 {
+			tagStr = " [" + strings.Join(p.Tags, ", ") + "]"
+		}
+		fmt.Printf("  %s  %s (strength: %.1f)%s\n", p.ID[:min(8, len(p.ID))], p.Trigger, p.Strength, tagStr)
 	}
 
 	return nil
