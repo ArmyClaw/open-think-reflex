@@ -144,3 +144,20 @@ Return only the improved response content, without explanations.`, skill.Name, s
 	skill.Response = resp.Content
 	return nil
 }
+
+// ConvertSkillToPattern converts an AgentSkill back to OTR Pattern.
+func ConvertSkillToPattern(s *Skill) *otrmodels.Pattern {
+	p := otrmodels.NewPattern(s.Trigger, s.Response)
+	p.Tags = s.Tags
+	if s.Strength > 0 {
+		p.Strength = s.Strength
+	}
+	if s.Threshold > 0 {
+		p.Threshold = s.Threshold
+	}
+	if !s.LastUsed.IsZero() {
+		p.LastUsedAt = &s.LastUsed
+	}
+	p.ReinforceCnt = s.UsageCount
+	return p
+}
