@@ -488,6 +488,13 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 			Usage: "Share a pattern",
 			Subcommands: []*cli.Command{
 				{
+					Name:  "list",
+					Usage: "List all public patterns",
+					Action: func(c *cli.Context) error {
+						return listPublicPatterns(storage)
+					},
+				},
+				{
 					Name:  "create",
 					Usage: "Create a shareable link for a pattern",
 					Flags: []cli.Flag{
@@ -1255,6 +1262,33 @@ func createBackup(storage *sqlite.Storage, outputPath, format string, includeNot
 		}
 		fmt.Printf("Backup completed: %s (%d patterns)\n", outputPath, len(patterns))
 	}
+
+	return nil
+}
+
+// listPublicPatterns lists all patterns (shareable ones)
+func listPublicPatterns(storage *sqlite.Storage) error {
+	ctx := context.Background()
+
+	patterns, err := storage.ListPatterns(ctx, contracts.ListOptions{Limit: 100})
+	if err != nil {
+		return fmt.Errorf("failed to list patterns: %w", err)
+	}
+
+	if len(patterns) == 0 {
+		fmt.Println("No patterns found")
+		return nil
+	}
+
+	fmt.Printf("Public Patterns (%d total):\n\n", len(patterns))
+	for _, p := range patterns {
+		preview := p.Response
+		if len(preview) > 40 {
+			preview = preview[:40] + "..."
+		}
+		fmt.Printf("  %s  %s -> %s\n", p.ID[:min(8, len(p.ID))], p.Trigger, preview)
+	}
+	fmt.Printf("\nUse 'otr share create --id <id>' to share a pattern\n")
 
 	return nil
 }
