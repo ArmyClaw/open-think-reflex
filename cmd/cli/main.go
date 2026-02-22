@@ -214,6 +214,7 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 				{
 					Name:  "update",
 					Usage: "Update a pattern",
+					Aliases: []string{"edit"},
 					Flags: []cli.Flag{
 						&cli.StringFlag{
 							Name:     "id",
