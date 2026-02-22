@@ -537,6 +537,7 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 		{
 			Name:  "summary",
 			Usage: "Show overall statistics summary",
+			Aliases: []string{"s"},
 			Action: func(c *cli.Context) error {
 				return showSummary(storage)
 			},
@@ -637,6 +638,7 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 		{
 			Name:  "run",
 			Usage: "Run a query against patterns",
+			Aliases: []string{"r"},
 			Flags: []cli.Flag{
 				&cli.StringFlag{
 					Name:     "query",
