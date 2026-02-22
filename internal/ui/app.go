@@ -31,6 +31,7 @@ type App struct {
 	filterPanel  *FilterPanel
 	statsPanel   *StatsPanel
 	patternForm  *PatternFormPanel
+	settingsPanel *SettingsPanel
 	
 	// State
 	currentSpace *models.Space
@@ -39,6 +40,7 @@ type App struct {
 	mode         AppMode // input, navigation
 	showStats    bool
 	showForm     bool
+	showSettings bool
 }
 
 // AppMode represents the current interaction mode
@@ -129,6 +131,10 @@ func (a *App) setupPages() {
 	// Create pattern form panel
 	a.patternForm = NewPatternFormPanel(a.theme, a.handlePatternSave, a.handlePatternCancel)
 	
+	// Create settings panel
+	a.settingsPanel = NewSettingsPanel(a.theme, a)
+	a.showSettings = false
+	
 	// Set up filter callback
 	a.filterPanel.onFilter = a.filterPatterns
 	
@@ -150,6 +156,7 @@ func (a *App) setupPages() {
 	a.pages.AddPage("filter", a.filterPanel.GetView(), false, false)
 	a.pages.AddPage("stats", a.statsPanel.GetView(), false, false)
 	a.pages.AddPage("form", a.patternForm.GetView(), false, false)
+	a.pages.AddPage("settings", a.settingsPanel.View(), false, false)
 }
 
 func (a *App) createHeader() tview.Primitive {
@@ -302,6 +309,10 @@ func (a *App) setupKeyBindings() {
 			case 's':
 				// Toggle stats panel
 				a.toggleStats()
+				return nil
+			case ',':
+				// Toggle settings panel
+				a.toggleSettings()
 				return nil
 			case 'h':
 				// Left arrow equivalent
@@ -515,6 +526,22 @@ func (a *App) toggleStats() {
 		a.statsPanel.SetVisible(true)
 		a.pages.ShowPage("stats")
 		a.pages.SwitchToPage("stats")
+	}
+}
+
+// toggleSettings toggles the settings panel visibility
+func (a *App) toggleSettings() {
+	if a.showSettings {
+		a.showSettings = false
+		a.settingsPanel.SetVisible(false)
+		a.pages.HidePage("settings")
+		a.pages.SwitchToPage("main")
+		a.app.SetFocus(a.input.view)
+	} else {
+		a.showSettings = true
+		a.settingsPanel.SetVisible(true)
+		a.pages.ShowPage("settings")
+		a.pages.SwitchToPage("settings")
 	}
 }
 
