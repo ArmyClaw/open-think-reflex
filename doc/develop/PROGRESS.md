@@ -4,30 +4,25 @@
 
 ---
 
-## 🚀 Phase 8: 项目空间 (v2.0) (2026-02-22 11:32)
+## 🚀 Phase 8: 项目空间 (v2.0) (2026-02-22 11:40)
 
 ### 项目状态
 - **版本**: v2.0 (开发中)
-- **当前迭代**: Iter 70 ✅ 完成
+- **当前迭代**: Iter 71 ✅ 完成
 - **阶段**: Phase 8 - 项目空间
 
-### Iter 70 完成 ✅ (2026-02-22 11:32)
-- Space 统计面板
-- 新增 internal/ui/space_stats.go:
-  - SpaceStatsPanel 组件: 显示 Space 统计信息
-  - 显示内容:
-    - 总 Space 数量
-    - 总 Pattern 数量
-    - 每个 Space 的 Pattern 数量和描述
-    - 默认 Space 数量
-    - 24小时内创建的 Space 数量
-    - 最活跃的 Space
-  - 支持主题切换
-- 更新 internal/ui/app.go:
-  - 添加 spaceStatsPanel 字段
-  - 添加 showSpaceStats 状态管理
-  - 添加 toggleSpaceStats 函数
-  - 添加 [S] 快捷键切换 Space 统计面板
+### Iter 71 完成 ✅ (2026-02-22 11:40)
+- Space 迁移 - Pattern 跨 Space 移动
+- 更新 internal/data/sqlite/storage.go:
+  - 添加 MovePatternToSpace 方法
+- 更新 pkg/contracts/storage.go:
+  - 添加 MovePatternToSpace 接口
+- 添加 `otr pattern move --id --space` 命令
+- 编译通过，测试通过 (18/18 packages)
+- 已推送到 GitHub
+
+### 下一步
+- Iter 72: Space 导入导出
 - 更新 internal/ui/help.go:
   - 添加 [S] 快捷键说明到帮助文档
   - 更新 ShortcutBar 显示
