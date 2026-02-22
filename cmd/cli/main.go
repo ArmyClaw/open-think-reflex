@@ -29,7 +29,7 @@ func main() {
 
 // Run runs the CLI application
 func Run() error {
-	cfg, err := loadConfig()
+	cfg, loader, err := loadConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
@@ -44,7 +44,7 @@ func Run() error {
 		Name:    "otr",
 		Version: Version,
 		Usage:   "Open-Think-Reflex: AI Input Accelerator",
-		Commands: buildCommands(storage),
+		Commands: buildCommands(storage, cfg, loader),
 		Action: func(c *cli.Context) error {
 			fmt.Println("Open-Think-Reflex v" + Version)
 			fmt.Println("\nUse 'otr --help' to see available commands")
@@ -56,15 +56,22 @@ func Run() error {
 	return app.Run(os.Args)
 }
 
-func loadConfig() (*config.Config, error) {
+var configLoader *config.Loader
+
+func loadConfig() (*config.Config, *config.Loader, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get home directory: %w", err)
+		return nil, nil, fmt.Errorf("failed to get home directory: %w", err)
 	}
 
 	configPath := fmt.Sprintf("%s/.openclaw/reflex", homeDir)
 	loader := config.NewLoader(configPath, "config")
-	return loader.Load()
+	configLoader = loader
+	cfg, err := loader.Load()
+	if err != nil {
+		return nil, loader, err
+	}
+	return cfg, loader, nil
 }
 
 func initStorage(cfg *config.Config) (*sqlite.Storage, error) {
@@ -85,7 +92,7 @@ func initStorage(cfg *config.Config) (*sqlite.Storage, error) {
 	return sqlite.NewStorage(db), nil
 }
 
-func buildCommands(storage *sqlite.Storage) []*cli.Command {
+func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.Loader) []*cli.Command {
 	return []*cli.Command{
 		{
 			Name:  "interactive",
@@ -256,7 +263,7 @@ func buildCommands(storage *sqlite.Storage) []*cli.Command {
 					Usage:     "Switch to a space",
 					ArgsUsage: "<space_id>",
 					Action: func(c *cli.Context) error {
-						return commands.UseSpace(storage, c.Args().First())
+						return commands.UseSpace(storage, cfg, loader, c.Args().First())
 					},
 				},
 			},

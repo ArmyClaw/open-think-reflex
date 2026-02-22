@@ -171,7 +171,7 @@ func TestGenerateSpaceID(t *testing.T) {
 
 func TestBuildCommands(t *testing.T) {
 	storage := setupTestStorage(t)
-	commands := BuildCommands(storage)
+	commands := BuildCommands(storage, nil, nil)
 	
 	// Should return some commands
 	if len(commands) == 0 {

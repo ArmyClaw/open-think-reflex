@@ -31,6 +31,9 @@ type Config struct {
 
 	// Security and audit settings
 	Security SecurityConfig `mapstructure:"security"`
+
+	// CurrentSpace (v2.0) - the currently active space
+	CurrentSpace string `mapstructure:"current_space"`
 }
 
 // AppConfig contains application-level settings.
@@ -339,4 +342,14 @@ func (c *Config) GetAIProvider() string {
 // GetDefaultModel returns the default AI model
 func (c *Config) GetDefaultModel() string {
 	return c.AI.DefaultModel
+}
+
+// GetCurrentSpace returns the current space ID
+func (c *Config) GetCurrentSpace() string {
+	return c.CurrentSpace
+}
+
+// SetCurrentSpace sets the current space ID
+func (c *Config) SetCurrentSpace(spaceID string) {
+	c.CurrentSpace = spaceID
 }

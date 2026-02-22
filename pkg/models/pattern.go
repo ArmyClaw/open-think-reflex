@@ -27,6 +27,10 @@ type Pattern struct {
 	// Response is the AI-generated content returned when triggered
 	Response string `json:"response" db:"response"`
 
+	// ==================== Space (v2.0) ====================
+	// SpaceID identifies which space this pattern belongs to
+	SpaceID string `json:"space_id" db:"space_id"`
+
 	// ==================== Strength Management ====================
 	// Strength is the current activation strength (0-100).
 	// Increases with use (reinforce), decreases over time (decay).
@@ -78,6 +82,7 @@ func NewPattern(trigger, response string) *Pattern {
 		UpdatedAt:    now,
 		Trigger:      trigger,
 		Response:     response,
+		SpaceID:      "global", // Default to global space
 		Strength:     0.0,
 		Threshold:    50.0,
 		DecayRate:    0.01,

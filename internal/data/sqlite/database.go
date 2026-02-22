@@ -132,6 +132,7 @@ func (d *Database) Migrate(ctx context.Context) error {
 			tags TEXT,
 			project TEXT,
 			user_id TEXT,
+			space_id TEXT DEFAULT 'global',
 			deleted_at INTEGER
 		)`,
 
@@ -175,6 +176,7 @@ func (d *Database) Migrate(ctx context.Context) error {
 		`CREATE INDEX IF NOT EXISTS idx_patterns_project_deleted ON patterns(project, deleted_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_patterns_strength_threshold ON patterns(strength, threshold)`,
 		`CREATE INDEX IF NOT EXISTS idx_patterns_decay_enabled ON patterns(decay_enabled)`,
+		`CREATE INDEX IF NOT EXISTS idx_patterns_space_id ON patterns(space_id)`,
 	}
 
 	for _, migration := range migrations {

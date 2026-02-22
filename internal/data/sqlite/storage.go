@@ -57,17 +57,22 @@ func (s *Storage) SavePattern(ctx context.Context, p *models.Pattern) error {
 		p.CreatedAt = now
 	}
 	p.UpdatedAt = now
+	
+	// Default space_id to "global" if not set
+	if p.SpaceID == "" {
+		p.SpaceID = "global"
+	}
 
 	_, err := s.db.db.ExecContext(ctx, `
 		INSERT OR REPLACE INTO patterns (
 			id, trigger, response, strength, threshold, decay_rate, decay_enabled,
 			connections, created_at, updated_at, reinforcement_count, decay_count,
-			last_used_at, tags, project, user_id, deleted_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			last_used_at, tags, project, user_id, space_id, deleted_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		p.ID, p.Trigger, p.Response, p.Strength, p.Threshold, p.DecayRate, p.DecayEnabled,
 		string(connections), p.CreatedAt.Unix(), p.UpdatedAt.Unix(), p.ReinforceCnt, p.DecayCnt,
-		int64TimeToPtr(p.LastUsedAt), string(tags), p.Project, p.UserID, int64TimeToPtr(p.DeletedAt),
+		int64TimeToPtr(p.LastUsedAt), string(tags), p.Project, p.UserID, p.SpaceID, int64TimeToPtr(p.DeletedAt),
 	)
 
 	return err
@@ -120,9 +125,15 @@ func (s *Storage) GetPattern(ctx context.Context, id string) (*models.Pattern, e
 func (s *Storage) ListPatterns(ctx context.Context, opts contracts.ListOptions) ([]*models.Pattern, error) {
 	query := `SELECT id, trigger, response, strength, threshold, decay_rate, decay_enabled,
 		connections, created_at, updated_at, reinforcement_count, decay_count,
-		last_used_at, tags, project, user_id
+		last_used_at, tags, project, user_id, space_id
 		FROM patterns WHERE deleted_at IS NULL`
 	args := []interface{}{}
+
+	// Filter by space (v2.0)
+	if opts.SpaceID != "" {
+		query += " AND space_id = ?"
+		args = append(args, opts.SpaceID)
+	}
 
 	// Apply filters
 	if opts.Project != "" {
@@ -157,13 +168,13 @@ func (s *Storage) ListPatterns(ctx context.Context, opts contracts.ListOptions) 
 	var patterns []*models.Pattern
 	for rows.Next() {
 		var p models.Pattern
-		var connections, tags sql.NullString
+		var connections, tags, spaceID sql.NullString
 		var lastUsedAt, createdAt, updatedAt sql.NullInt64
 
 		err := rows.Scan(
 			&p.ID, &p.Trigger, &p.Response, &p.Strength, &p.Threshold, &p.DecayRate, &p.DecayEnabled,
 			&connections, &createdAt, &updatedAt, &p.ReinforceCnt, &p.DecayCnt,
-			&lastUsedAt, &tags, &p.Project, &p.UserID,
+			&lastUsedAt, &tags, &p.Project, &p.UserID, &spaceID,
 		)
 		if err != nil {
 			return nil, err
@@ -182,6 +193,7 @@ func (s *Storage) ListPatterns(ctx context.Context, opts contracts.ListOptions) 
 		p.CreatedAt = int64ToTime(createdAt)
 		p.UpdatedAt = int64ToTime(updatedAt)
 		p.LastUsedAt = int64ToTimePtr(lastUsedAt)
+		p.SpaceID = spaceID.String // Default to empty string if NULL, will use global
 
 		patterns = append(patterns, &p)
 	}

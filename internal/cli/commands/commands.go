@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ArmyClaw/open-think-reflex/internal/config"
 	"github.com/ArmyClaw/open-think-reflex/internal/data/sqlite"
 	"github.com/ArmyClaw/open-think-reflex/pkg/contracts"
 	"github.com/ArmyClaw/open-think-reflex/pkg/export"
@@ -20,7 +21,7 @@ import (
 // Commands include:
 //   - pattern: Manage reflex patterns (list, create, show, delete)
 //   - version: Display version information
-func BuildCommands(storage *sqlite.Storage) []*cli.Command {
+func BuildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.Loader) []*cli.Command {
 	return []*cli.Command{
 		{
 			Name:  "pattern",
@@ -124,7 +125,7 @@ func BuildCommands(storage *sqlite.Storage) []*cli.Command {
 					Usage:     "Switch to a space",
 					ArgsUsage: "<space_id>",
 					Action: func(c *cli.Context) error {
-						return UseSpace(storage, c.Args().First())
+						return UseSpace(storage, cfg, loader, c.Args().First())
 					},
 				},
 			},
@@ -350,8 +351,8 @@ func DeleteSpace(storage *sqlite.Storage, spaceID string) error {
 	return nil
 }
 
-// UseSpace switches to a different space.
-func UseSpace(storage *sqlite.Storage, spaceID string) error {
+// UseSpace switches to a different space and saves to config if loader is provided.
+func UseSpace(storage *sqlite.Storage, cfg *config.Config, loader *config.Loader, spaceID string) error {
 	if spaceID == "" {
 		return fmt.Errorf("space ID is required")
 	}
@@ -362,6 +363,19 @@ func UseSpace(storage *sqlite.Storage, spaceID string) error {
 	space, err := storage.GetSpace(ctx, spaceID)
 	if err != nil {
 		return fmt.Errorf("failed to get space: %w", err)
+	}
+
+	// Save current space to config if loader is provided
+	if cfg != nil && loader != nil {
+		cfg.CurrentSpace = spaceID
+		if err := loader.Save(cfg); err != nil {
+			fmt.Printf("Warning: failed to save current space: %v\n", err)
+			fmt.Printf("Switched to space: %s (%s)\n", space.Name, space.ID)
+		} else {
+			fmt.Printf("Switched to space: %s (%s)\n", space.Name, space.ID)
+			fmt.Println("Current space saved to config")
+		}
+		return nil
 	}
 
 	fmt.Printf("Switched to space: %s (%s)\n", space.Name, space.ID)

@@ -108,6 +108,10 @@ type ListOptions struct {
 	// Default: "" (no filter)
 	Project string
 
+	// SpaceID filters patterns by space (v2.0).
+	// Default: "" (no filter)
+	SpaceID string
+
 	// MinStrength filters patterns with strength >= this value.
 	// Default: 0.0 (no filter)
 	MinStrength float64
