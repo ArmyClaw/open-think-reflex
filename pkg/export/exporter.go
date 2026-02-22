@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ArmyClaw/open-think-reflex/pkg/models"
+	"github.com/ArmyClaw/open-think-reflex/pkg/skills"
 	"gopkg.in/yaml.v3"
 )
 
@@ -310,4 +311,18 @@ func (i *Importer) ImportNotesFromYAML(ctx context.Context, filepath string) (*N
 	}
 
 	return &importData, nil
+}
+
+// ExportSkillToJSON exports a single skill to a JSON file.
+func (e *Exporter) ExportSkillToJSON(skill *skills.Skill, filepath string) error {
+	data, err := json.MarshalIndent(skill, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal skill: %w", err)
+	}
+
+	if err := os.WriteFile(filepath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	return nil
 }

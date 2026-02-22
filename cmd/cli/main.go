@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/ArmyClaw/open-think-reflex/internal/cli/commands"
@@ -1479,9 +1481,49 @@ func exportSkillsBatch(storage *sqlite.Storage, outputDir, spaceID string) error
 		return fmt.Errorf("failed to list patterns: %w", err)
 	}
 
-	fmt.Printf("Found %d patterns to export\n", len(patterns))
-	// TODO: Implement batch export
+	if len(patterns) == 0 {
+		fmt.Println("No patterns found to export")
+		return nil
+	}
 
+	fmt.Printf("Found %d patterns to export\n", len(patterns))
+
+	// Create output directory if it doesn't exist
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
+	}
+
+	// Export each pattern as a separate skill file
+	exporter := export.NewExporter()
+	successCount := 0
+	for _, p := range patterns {
+		// Get space name
+		spaceName := "global"
+		if p.SpaceID != "" {
+			space, err := storage.GetSpace(ctx, p.SpaceID)
+			if err == nil {
+				spaceName = space.Name
+			}
+		}
+
+		// Convert to skill
+		skill := skills.ConvertPatternToSkill(p, spaceName)
+
+		// Create filename from trigger
+		filename := strings.ReplaceAll(skill.Trigger, "/", "_")
+		filename = strings.ReplaceAll(filename, " ", "_")
+		filename = strings.ToLower(filename) + ".json"
+		filepath := filepath.Join(outputDir, filename)
+
+		// Export to JSON
+		if err := exporter.ExportSkillToJSON(skill, filepath); err != nil {
+			fmt.Printf("Warning: Failed to export %s: %v\n", skill.Trigger, err)
+			continue
+		}
+		successCount++
+	}
+
+	fmt.Printf("Successfully exported %d/%d patterns to %s\n", successCount, len(patterns), outputDir)
 	return nil
 }
 
