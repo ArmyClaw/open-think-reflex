@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/ArmyClaw/open-think-reflex/internal/core/matcher"
 	"github.com/ArmyClaw/open-think-reflex/internal/data/sqlite"
@@ -32,6 +33,7 @@ type App struct {
 	statsPanel   *StatsPanel
 	patternForm  *PatternFormPanel
 	settingsPanel *SettingsPanel
+	historyPanel *HistoryPanel
 	
 	// State
 	currentSpace *models.Space
@@ -41,6 +43,7 @@ type App struct {
 	showStats    bool
 	showForm     bool
 	showSettings bool
+	showHistory  bool
 }
 
 // AppMode represents the current interaction mode
@@ -135,6 +138,10 @@ func (a *App) setupPages() {
 	a.settingsPanel = NewSettingsPanel(a.theme, a)
 	a.showSettings = false
 	
+	// Create history panel
+	a.historyPanel = NewHistoryPanel(a.theme, a.handleHistorySelect)
+	a.showHistory = false
+	
 	// Set up filter callback
 	a.filterPanel.onFilter = a.filterPatterns
 	
@@ -157,6 +164,7 @@ func (a *App) setupPages() {
 	a.pages.AddPage("stats", a.statsPanel.GetView(), false, false)
 	a.pages.AddPage("form", a.patternForm.GetView(), false, false)
 	a.pages.AddPage("settings", a.settingsPanel.View(), false, false)
+	a.pages.AddPage("history", a.historyPanel.View(), false, false)
 }
 
 func (a *App) createHeader() tview.Primitive {
@@ -365,6 +373,10 @@ func (a *App) setupKeyBindings() {
 					}
 				}
 				return nil
+			case 'y':
+				// Toggle history panel
+				a.toggleHistory()
+				return nil
 			}
 		}
 		return event
@@ -440,6 +452,18 @@ func (a *App) handleInput(text string) {
 	
 	// Update thought chain with results
 	a.thoughtChain.SetResults(results)
+	
+	// Record in history (for each matched pattern)
+	for _, r := range results {
+		entry := HistoryEntry{
+			ID:        fmt.Sprintf("hist-%d", len(a.historyPanel.entries)),
+			Input:     text,
+			Response:  r.Pattern.Response,
+			Timestamp: time.Now(),
+			PatternID: r.Pattern.ID,
+		}
+		a.historyPanel.AddEntry(entry)
+	}
 	
 	// Update status bar
 	a.statusBar.SetMatchCount(len(results))
@@ -543,6 +567,34 @@ func (a *App) toggleSettings() {
 		a.pages.ShowPage("settings")
 		a.pages.SwitchToPage("settings")
 	}
+}
+
+// toggleHistory toggles the history panel visibility
+func (a *App) toggleHistory() {
+	if a.showHistory {
+		a.showHistory = false
+		a.historyPanel.SetVisible(false)
+		a.pages.HidePage("history")
+		a.pages.SwitchToPage("main")
+		a.app.SetFocus(a.input.view)
+	} else {
+		// Populate history from patterns
+		a.historyPanel.SetPatternsHistory(a.patterns)
+		
+		a.showHistory = true
+		a.historyPanel.SetVisible(true)
+		a.pages.ShowPage("history")
+		a.pages.SwitchToPage("history")
+	}
+}
+
+// handleHistorySelect handles history entry selection
+func (a *App) handleHistorySelect(entry HistoryEntry) {
+	a.output.SetFormattedOutput("History Detail",
+		fmt.Sprintf("Input: %s\n\nResponse: %s\n\nTime: %s",
+			entry.Input,
+			entry.Response,
+			entry.Timestamp.Format("2006-01-02 15:04:05")))
 }
 
 // showPatternForm shows the pattern form for creating or editing

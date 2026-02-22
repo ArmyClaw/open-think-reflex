@@ -52,6 +52,7 @@ func (h *HelpPanel) getHelpContent() string {
 │  [/]         Toggle Filter panel                                │
 │  [s]         Toggle Statistics panel                            │
 │  [,]         Toggle Settings panel                             │
+│  [y]         Toggle History panel                              │
 │  [c]         Create new pattern (Input mode)                    │
 │  [e]         Edit selected pattern (Navigation mode)            │
 │  [d]         Delete selected pattern (Navigation mode)         │
@@ -139,9 +140,9 @@ func (s *ShortcutBar) createView() *tview.TextView {
 
 func (s *ShortcutBar) getShortcuts(mode AppMode) string {
 	if mode == ModeNavigation {
-		return " [↑/↓] Navigate | [Enter] Select | [←/→] Expand/Collapse | [e] Edit | [d] Delete | [/] Filter | [s] Stats | [,] Settings | [?] Help | [q] Quit "
+		return " [↑/↓] Navigate | [Enter] Select | [←/→] Expand/Collapse | [e] Edit | [d] Delete | [/] Filter | [s] Stats | [y] History | [,] Settings | [?] Help | [q] Quit "
 	}
-	return " [Tab] Switch | [c] Create | [t] Theme | [/] Filter | [s] Stats | [,] Settings | [?] Help | [q] Quit "
+	return " [Tab] Switch | [c] Create | [t] Theme | [/] Filter | [s] Stats | [y] History | [,] Settings | [?] Help | [q] Quit "
 }
 
 // View returns the underlying tview primitive
