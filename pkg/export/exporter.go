@@ -158,6 +158,22 @@ type SpaceImportData struct {
 	Patterns []models.Pattern  `json:"patterns"`
 }
 
+// NoteExportData represents the structure of an exported notes file.
+type NoteExportData struct {
+	Version    string          `json:"version"`
+	ExportedAt time.Time       `json:"exported_at"`
+	NoteCount  int             `json:"note_count"`
+	Notes      []models.Note   `json:"notes"`
+}
+
+// NoteImportData represents the structure of an imported notes file.
+type NoteImportData struct {
+	Version   string         `json:"version"`
+	ExportedAt time.Time    `json:"exported_at"`
+	NoteCount int           `json:"note_count"`
+	Notes     []models.Note `json:"notes"`
+}
+
 // Importer handles importing patterns from various formats.
 type Importer struct{}
 
@@ -201,6 +217,96 @@ func (i *Importer) ImportSpaceFromJSON(ctx context.Context, filepath string) (*S
 	// Validate import data
 	if importData.Patterns == nil {
 		importData.Patterns = make([]models.Pattern, 0)
+	}
+
+	return &importData, nil
+}
+
+// ExportNotesToJSON exports notes to a JSON file.
+func (e *Exporter) ExportNotesToJSON(ctx context.Context, notes []*models.Note, filepath string) error {
+	noteValues := make([]models.Note, len(notes))
+	for i, n := range notes {
+		noteValues[i] = *n
+	}
+
+	exportData := NoteExportData{
+		Version:    "1.0",
+		ExportedAt: time.Now(),
+		NoteCount:  len(noteValues),
+		Notes:      noteValues,
+	}
+
+	data, err := json.MarshalIndent(exportData, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal export data: %w", err)
+	}
+
+	if err := os.WriteFile(filepath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	return nil
+}
+
+// ExportNotesToYAML exports notes to a YAML file.
+func (e *Exporter) ExportNotesToYAML(ctx context.Context, notes []*models.Note, filepath string) error {
+	noteValues := make([]models.Note, len(notes))
+	for i, n := range notes {
+		noteValues[i] = *n
+	}
+
+	exportData := NoteExportData{
+		Version:    "1.0",
+		ExportedAt: time.Now(),
+		NoteCount:  len(noteValues),
+		Notes:      noteValues,
+	}
+
+	data, err := yaml.Marshal(exportData)
+	if err != nil {
+		return fmt.Errorf("failed to marshal export data: %w", err)
+	}
+
+	if err := os.WriteFile(filepath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	return nil
+}
+
+// ImportNotesFromJSON imports notes from a JSON file.
+func (i *Importer) ImportNotesFromJSON(ctx context.Context, filepath string) (*NoteImportData, error) {
+	data, err := os.ReadFile(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	var importData NoteImportData
+	if err := json.Unmarshal(data, &importData); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal import data: %w", err)
+	}
+
+	if importData.Notes == nil {
+		importData.Notes = make([]models.Note, 0)
+	}
+
+	return &importData, nil
+}
+
+// ImportNotesFromYAML imports notes from a YAML file.
+func (i *Importer) ImportNotesFromYAML(ctx context.Context, filepath string) (*NoteImportData, error) {
+	data, err := os.ReadFile(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	var importData NoteImportData
+	if err := yaml.Unmarshal(data, &importData); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal import data: %w", err)
+	}
+
+	if importData.Notes == nil {
+		importData.Notes = make([]models.Note, 0)
 	}
 
 	return &importData, nil

@@ -460,6 +460,28 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 			},
 		},
 		{
+			Name:  "backup",
+			Usage: "Backup data to a file",
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:     "output",
+					Required: true,
+					Usage:    "Output backup file path",
+				},
+				&cli.StringFlag{
+					Name:  "format",
+					Usage: "Backup format: json, yaml (default: json)",
+				},
+				&cli.BoolFlag{
+					Name:  "include-notes",
+					Usage: "Include notes in backup",
+				},
+			},
+			Action: func(c *cli.Context) error {
+				return createBackup(storage, c.String("output"), c.String("format"), c.Bool("include-notes"))
+			},
+		},
+		{
 			Name:  "run",
 			Usage: "Run a query against patterns",
 			Flags: []cli.Flag{
@@ -1138,6 +1160,66 @@ func exportPatterns(storage *sqlite.Storage, outputPath, projectFilter string) e
 	}
 
 	fmt.Printf("Exported %d patterns to %s\n", len(patterns), outputPath)
+	return nil
+}
+
+// createBackup creates a full backup of all data
+func createBackup(storage *sqlite.Storage, outputPath, format string, includeNotes bool) error {
+	if outputPath == "" {
+		return fmt.Errorf("output path required")
+	}
+
+	if format == "" {
+		format = "json"
+	}
+
+	ctx := context.Background()
+
+	// Get all patterns
+	patterns, err := storage.ListPatterns(ctx, contracts.ListOptions{Limit: 10000})
+	if err != nil {
+		return fmt.Errorf("failed to list patterns: %w", err)
+	}
+
+	// Get all spaces
+	spaces, err := storage.ListSpaces(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to list spaces: %w", err)
+	}
+
+	fmt.Printf("Backing up %d patterns and %d spaces...\n", len(patterns), len(spaces))
+
+	exporter := export.NewExporter()
+
+	// Export based on format
+	switch format {
+	case "yaml", "yml":
+		// Export each space separately with YAML
+		for _, space := range spaces {
+			spacePatterns, err := storage.ListPatterns(ctx, contracts.ListOptions{SpaceID: space.ID, Limit: 10000})
+			if err != nil {
+				fmt.Printf("Warning: failed to list patterns for space %s: %v\n", space.Name, err)
+				continue
+			}
+			filename := outputPath
+			if len(spaces) > 1 {
+				filename = fmt.Sprintf("%s_%s.yaml", outputPath[:len(outputPath)-5], space.ID)
+			}
+			if err := exporter.ExportSpaceToYAML(ctx, space, spacePatterns, filename); err != nil {
+				fmt.Printf("Warning: failed to backup space %s: %v\n", space.Name, err)
+			}
+		}
+		fmt.Printf("Backup completed: %s\n", outputPath)
+	case "json":
+		fallthrough
+	default:
+		// Export all as single JSON
+		if err := exporter.ExportToJSON(ctx, patterns, outputPath); err != nil {
+			return fmt.Errorf("failed to backup: %w", err)
+		}
+		fmt.Printf("Backup completed: %s (%d patterns)\n", outputPath, len(patterns))
+	}
+
 	return nil
 }
 
