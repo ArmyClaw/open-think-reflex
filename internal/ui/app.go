@@ -27,13 +27,14 @@ type App struct {
 	output       *OutputView
 	input        *InputView
 	statusBar    *StatusBar
-	helpPanel    *HelpPanel
-	shortcutBar  *ShortcutBar
-	filterPanel  *FilterPanel
-	statsPanel   *StatsPanel
-	patternForm  *PatternFormPanel
+	helpPanel     *HelpPanel
+	shortcutBar   *ShortcutBar
+	filterPanel   *FilterPanel
+	statsPanel    *StatsPanel
+	spaceStatsPanel *SpaceStatsPanel
+	patternForm   *PatternFormPanel
 	settingsPanel *SettingsPanel
-	historyPanel *HistoryPanel
+	historyPanel  *HistoryPanel
 	
 	// State
 	currentSpace *models.Space
@@ -41,6 +42,7 @@ type App struct {
 	results      []contracts.MatchResult
 	mode         AppMode // input, navigation
 	showStats    bool
+	showSpaceStats bool
 	showForm     bool
 	showSettings bool
 	showHistory  bool
@@ -128,7 +130,9 @@ func (a *App) setupPages() {
 	a.shortcutBar = NewShortcutBar(a.theme)
 	a.filterPanel = NewFilterPanel()
 	a.statsPanel = NewStatsPanel()
+	a.spaceStatsPanel = NewSpaceStatsPanel()
 	a.showStats = false
+	a.showSpaceStats = false
 	a.showForm = false
 	
 	// Create pattern form panel
@@ -162,6 +166,7 @@ func (a *App) setupPages() {
 	a.pages.AddPage("help", a.helpPanel.View(), false, false)
 	a.pages.AddPage("filter", a.filterPanel.GetView(), false, false)
 	a.pages.AddPage("stats", a.statsPanel.GetView(), false, false)
+	a.pages.AddPage("spaceStats", a.spaceStatsPanel.GetView(), false, false)
 	a.pages.AddPage("form", a.patternForm.GetView(), false, false)
 	a.pages.AddPage("settings", a.settingsPanel.View(), false, false)
 	a.pages.AddPage("history", a.historyPanel.View(), false, false)
@@ -317,6 +322,10 @@ func (a *App) setupKeyBindings() {
 			case 's':
 				// Toggle stats panel
 				a.toggleStats()
+				return nil
+			case 'S':
+				// Toggle space stats panel
+				a.toggleSpaceStats()
 				return nil
 			case ',':
 				// Toggle settings panel
@@ -550,6 +559,30 @@ func (a *App) toggleStats() {
 		a.statsPanel.SetVisible(true)
 		a.pages.ShowPage("stats")
 		a.pages.SwitchToPage("stats")
+	}
+}
+
+// toggleSpaceStats toggles the space statistics panel visibility
+func (a *App) toggleSpaceStats() {
+	if a.showSpaceStats {
+		a.showSpaceStats = false
+		a.spaceStatsPanel.SetVisible(false)
+		a.pages.HidePage("spaceStats")
+		a.pages.SwitchToPage("main")
+		a.app.SetFocus(a.input.view)
+	} else {
+		// Get spaces from storage
+		spaces, err := a.storage.ListSpaces(context.Background())
+		if err != nil {
+			a.output.SetOutput("Error loading spaces: " + err.Error())
+			return
+		}
+		a.spaceStatsPanel.SetSpaces(spaces)
+		
+		a.showSpaceStats = true
+		a.spaceStatsPanel.SetVisible(true)
+		a.pages.ShowPage("spaceStats")
+		a.pages.SwitchToPage("spaceStats")
 	}
 }
 
