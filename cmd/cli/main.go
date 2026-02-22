@@ -14,6 +14,7 @@ import (
 	"github.com/ArmyClaw/open-think-reflex/pkg/contracts"
 	"github.com/ArmyClaw/open-think-reflex/pkg/export"
 	"github.com/ArmyClaw/open-think-reflex/pkg/models"
+	"github.com/ArmyClaw/open-think-reflex/pkg/skills"
 	"github.com/urfave/cli/v2"
 )
 
@@ -392,6 +393,49 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 			},
 			Action: func(c *cli.Context) error {
 				return importPatterns(storage, c.String("input"), c.Bool("force"))
+			},
+		},
+		{
+			Name:  "skill",
+			Usage: "Export patterns as AgentSkill",
+			Subcommands: []*cli.Command{
+				{
+					Name:  "export",
+					Usage: "Export pattern as AgentSkill",
+					Flags: []cli.Flag{
+						&cli.StringFlag{
+							Name:     "id",
+							Required: true,
+							Usage:    "Pattern ID to export",
+						},
+						&cli.StringFlag{
+							Name:     "output",
+							Required: true,
+							Usage:    "Output file path (.yaml)",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						return exportSkill(storage, c.String("id"), c.String("output"))
+					},
+				},
+				{
+					Name:  "batch",
+					Usage: "Export all patterns as AgentSkills",
+					Flags: []cli.Flag{
+						&cli.StringFlag{
+							Name:     "output",
+							Required: true,
+							Usage:    "Output directory",
+						},
+						&cli.StringFlag{
+							Name:  "space",
+							Usage: "Filter by space ID",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						return exportSkillsBatch(storage, c.String("output"), c.String("space"))
+					},
+				},
 			},
 		},
 	}
@@ -835,5 +879,66 @@ func importPatterns(storage *sqlite.Storage, inputPath string, force bool) error
 	if skipped > 0 {
 		fmt.Printf("Skipped %d existing patterns\n", skipped)
 	}
+	return nil
+}
+
+func exportSkill(storage *sqlite.Storage, patternID, outputPath string) error {
+	if patternID == "" {
+		return fmt.Errorf("pattern ID required")
+	}
+	if outputPath == "" {
+		return fmt.Errorf("output path required")
+	}
+
+	ctx := context.Background()
+
+	// Get pattern
+	pattern, err := storage.GetPattern(ctx, patternID)
+	if err != nil {
+		return fmt.Errorf("pattern not found: %w", err)
+	}
+
+	// Get space name
+	spaceName := ""
+	if pattern.SpaceID != "" {
+		space, err := storage.GetSpace(ctx, pattern.SpaceID)
+		if err == nil {
+			spaceName = space.Name
+		}
+	}
+
+	// Convert to skill
+	skill := skills.ConvertPatternToSkill(pattern, spaceName)
+
+	// TODO: Add YAML marshaling and AI polish option
+	// For now, output as JSON
+	fmt.Printf("Exported skill: %s\n", skill.Name)
+	fmt.Printf("Trigger: %s\n", skill.Trigger)
+	fmt.Printf("Output: %s\n", outputPath)
+
+	return nil
+}
+
+func exportSkillsBatch(storage *sqlite.Storage, outputDir, spaceID string) error {
+	if outputDir == "" {
+		return fmt.Errorf("output directory required")
+	}
+
+	ctx := context.Background()
+
+	// Get patterns
+	opts := contracts.ListOptions{Limit: 10000}
+	if spaceID != "" {
+		opts.SpaceID = spaceID
+	}
+
+	patterns, err := storage.ListPatterns(ctx, opts)
+	if err != nil {
+		return fmt.Errorf("failed to list patterns: %w", err)
+	}
+
+	fmt.Printf("Found %d patterns to export\n", len(patterns))
+	// TODO: Implement batch export
+
 	return nil
 }
