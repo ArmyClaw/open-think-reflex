@@ -29,6 +29,9 @@ type Storage interface {
 	// Returns ErrNotFound if no pattern exists with the given ID.
 	DeletePattern(ctx context.Context, id string) error
 
+	// MovePatternToSpace moves a pattern to a different space.
+	MovePatternToSpace(ctx context.Context, patternID, newSpaceID string) error
+
 	// UpdatePattern updates an existing pattern.
 	// Returns ErrNotFound if no pattern exists with the given ID.
 	UpdatePattern(ctx context.Context, p *models.Pattern) error

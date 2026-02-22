@@ -210,6 +210,15 @@ func (s *Storage) DeletePattern(ctx context.Context, id string) error {
 	return err
 }
 
+// MovePatternToSpace moves a pattern to a different space
+func (s *Storage) MovePatternToSpace(ctx context.Context, patternID, newSpaceID string) error {
+	now := time.Now()
+	_, err := s.db.db.ExecContext(ctx, `
+		UPDATE patterns SET space_id = ?, updated_at = ? WHERE id = ?
+	`, newSpaceID, now.Unix(), patternID)
+	return err
+}
+
 // UpdatePattern updates an existing pattern
 func (s *Storage) UpdatePattern(ctx context.Context, p *models.Pattern) error {
 	p.UpdatedAt = time.Now()

@@ -153,6 +153,25 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 					},
 				},
 				{
+					Name:  "move",
+					Usage: "Move a pattern to a different space",
+					Flags: []cli.Flag{
+						&cli.StringFlag{
+							Name:     "id",
+							Required: true,
+							Usage:    "Pattern ID",
+						},
+						&cli.StringFlag{
+							Name:     "space",
+							Required: true,
+							Usage:    "Target space ID",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						return movePattern(storage, c.String("id"), c.String("space"))
+					},
+				},
+				{
 					Name:  "update",
 					Usage: "Update a pattern",
 					Flags: []cli.Flag{
@@ -407,6 +426,36 @@ func deletePattern(storage *sqlite.Storage, id string) error {
 	}
 
 	fmt.Printf("Pattern deleted: %s\n", id)
+	return nil
+}
+
+func movePattern(storage *sqlite.Storage, patternID, spaceID string) error {
+	if patternID == "" {
+		return fmt.Errorf("pattern ID required")
+	}
+	if spaceID == "" {
+		return fmt.Errorf("space ID required")
+	}
+
+	ctx := context.Background()
+
+	// Verify pattern exists
+	_, err := storage.GetPattern(ctx, patternID)
+	if err != nil {
+		return fmt.Errorf("pattern not found: %s", patternID)
+	}
+
+	// Verify space exists
+	_, err = storage.GetSpace(ctx, spaceID)
+	if err != nil {
+		return fmt.Errorf("space not found: %s", spaceID)
+	}
+
+	if err := storage.MovePatternToSpace(ctx, patternID, spaceID); err != nil {
+		return err
+	}
+
+	fmt.Printf("Pattern '%s' moved to space '%s'\n", patternID, spaceID)
 	return nil
 }
 
