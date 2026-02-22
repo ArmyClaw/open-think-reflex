@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/ArmyClaw/open-think-reflex/internal/cli/commands"
 	"github.com/ArmyClaw/open-think-reflex/internal/config"
 	"github.com/ArmyClaw/open-think-reflex/internal/core/matcher"
 	"github.com/ArmyClaw/open-think-reflex/internal/data/sqlite"
@@ -201,6 +202,61 @@ func buildCommands(storage *sqlite.Storage) []*cli.Command {
 					Usage: "Apply decay to all patterns",
 					Action: func(c *cli.Context) error {
 						return decayPatterns(storage)
+					},
+				},
+			},
+		},
+		{
+			Name:  "space",
+			Usage: "Manage pattern spaces",
+			Subcommands: []*cli.Command{
+				{
+					Name:  "list",
+					Usage: "List all spaces",
+					Action: func(c *cli.Context) error {
+						return commands.ListSpaces(storage)
+					},
+				},
+				{
+					Name:  "create",
+					Usage: "Create a new space",
+					Flags: []cli.Flag{
+						&cli.StringFlag{
+							Name:     "name",
+							Required: true,
+							Usage:    "Space name",
+						},
+						&cli.StringFlag{
+							Name:  "description",
+							Usage: "Space description",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						return commands.CreateSpace(storage, c.String("name"), c.String("description"))
+					},
+				},
+				{
+					Name:      "show",
+					Usage:     "Show space details",
+					ArgsUsage: "<space_id>",
+					Action: func(c *cli.Context) error {
+						return commands.ShowSpace(storage, c.Args().First())
+					},
+				},
+				{
+					Name:      "delete",
+					Usage:     "Delete a space",
+					ArgsUsage: "<space_id>",
+					Action: func(c *cli.Context) error {
+						return commands.DeleteSpace(storage, c.Args().First())
+					},
+				},
+				{
+					Name:      "use",
+					Usage:     "Switch to a space",
+					ArgsUsage: "<space_id>",
+					Action: func(c *cli.Context) error {
+						return commands.UseSpace(storage, c.Args().First())
 					},
 				},
 			},

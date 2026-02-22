@@ -82,7 +82,7 @@ func BuildCommands(storage *sqlite.Storage) []*cli.Command {
 					Name:  "list",
 					Usage: "List all spaces",
 					Action: func(c *cli.Context) error {
-						return listSpaces(storage)
+						return ListSpaces(storage)
 					},
 				},
 				{
@@ -100,7 +100,31 @@ func BuildCommands(storage *sqlite.Storage) []*cli.Command {
 						},
 					},
 					Action: func(c *cli.Context) error {
-						return createSpace(storage, c.String("name"), c.String("description"))
+						return CreateSpace(storage, c.String("name"), c.String("description"))
+					},
+				},
+				{
+					Name:      "show",
+					Usage:     "Show space details",
+					ArgsUsage: "<space_id>",
+					Action: func(c *cli.Context) error {
+						return ShowSpace(storage, c.Args().First())
+					},
+				},
+				{
+					Name:      "delete",
+					Usage:     "Delete a space",
+					ArgsUsage: "<space_id>",
+					Action: func(c *cli.Context) error {
+						return DeleteSpace(storage, c.Args().First())
+					},
+				},
+				{
+					Name:      "use",
+					Usage:     "Switch to a space",
+					ArgsUsage: "<space_id>",
+					Action: func(c *cli.Context) error {
+						return UseSpace(storage, c.Args().First())
 					},
 				},
 			},
@@ -237,8 +261,8 @@ func deletePattern(storage *sqlite.Storage, id string) error {
 	return nil
 }
 
-// listSpaces retrieves and displays all spaces.
-func listSpaces(storage *sqlite.Storage) error {
+// ListSpaces retrieves and displays all spaces.
+func ListSpaces(storage *sqlite.Storage) error {
 	ctx := context.Background()
 	spaces, err := storage.ListSpaces(ctx)
 	if err != nil {
@@ -258,8 +282,8 @@ func listSpaces(storage *sqlite.Storage) error {
 	return nil
 }
 
-// createSpace creates a new space for organizing patterns.
-func createSpace(storage *sqlite.Storage, name, description string) error {
+// CreateSpace creates a new space for organizing patterns.
+func CreateSpace(storage *sqlite.Storage, name, description string) error {
 	ctx := context.Background()
 	space := &models.Space{
 		ID:          generateSpaceID(),
@@ -274,6 +298,73 @@ func createSpace(storage *sqlite.Storage, name, description string) error {
 	}
 
 	fmt.Printf("Space created: %s\n", space.ID)
+	return nil
+}
+
+// ShowSpace displays details of a specific space.
+func ShowSpace(storage *sqlite.Storage, spaceID string) error {
+	if spaceID == "" {
+		return fmt.Errorf("space ID is required")
+	}
+	
+	ctx := context.Background()
+	space, err := storage.GetSpace(ctx, spaceID)
+	if err != nil {
+		return fmt.Errorf("failed to get space: %w", err)
+	}
+
+	fmt.Printf("Space Details:\n")
+	fmt.Printf("  ID:          %s\n", space.ID)
+	fmt.Printf("  Name:        %s\n", space.Name)
+	fmt.Printf("  Description: %s\n", space.Description)
+	fmt.Printf("  Owner:       %s\n", space.Owner)
+	fmt.Printf("  Default:     %v\n", space.DefaultSpace)
+	fmt.Printf("  Pattern Limit: %d\n", space.PatternLimit)
+	fmt.Printf("  Pattern Count: %d\n", space.PatternCount)
+	fmt.Printf("  Created:     %s\n", space.CreatedAt.Format("2006-01-02 15:04:05"))
+	fmt.Printf("  Updated:     %s\n", space.UpdatedAt.Format("2006-01-02 15:04:05"))
+	
+	return nil
+}
+
+// DeleteSpace deletes a space by ID.
+func DeleteSpace(storage *sqlite.Storage, spaceID string) error {
+	if spaceID == "" {
+		return fmt.Errorf("space ID is required")
+	}
+	
+	ctx := context.Background()
+	
+	// Check if space exists
+	_, err := storage.GetSpace(ctx, spaceID)
+	if err != nil {
+		return fmt.Errorf("space not found: %s", spaceID)
+	}
+
+	// Delete the space
+	if err := storage.DeleteSpace(ctx, spaceID); err != nil {
+		return fmt.Errorf("failed to delete space: %w", err)
+	}
+	
+	fmt.Printf("Space '%s' deleted\n", spaceID)
+	return nil
+}
+
+// UseSpace switches to a different space.
+func UseSpace(storage *sqlite.Storage, spaceID string) error {
+	if spaceID == "" {
+		return fmt.Errorf("space ID is required")
+	}
+	
+	ctx := context.Background()
+	
+	// Verify space exists
+	space, err := storage.GetSpace(ctx, spaceID)
+	if err != nil {
+		return fmt.Errorf("failed to get space: %w", err)
+	}
+
+	fmt.Printf("Switched to space: %s (%s)\n", space.Name, space.ID)
 	return nil
 }
 

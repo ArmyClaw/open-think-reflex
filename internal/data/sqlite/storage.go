@@ -243,13 +243,15 @@ func (s *Storage) CreateSpace(ctx context.Context, space *models.Space) error {
 // GetSpace retrieves a space by ID
 func (s *Storage) GetSpace(ctx context.Context, id string) (*models.Space, error) {
 	var space models.Space
+	var ownerNull sql.NullString
+	var createdAt, updatedAt sql.NullInt64
 
 	err := s.db.db.QueryRowContext(ctx, `
 		SELECT id, name, description, owner, is_default, pattern_limit, pattern_count, created_at, updated_at
 		FROM spaces WHERE id = ?
 	`, id).Scan(
-		&space.ID, &space.Name, &space.Description, &space.Owner, &space.DefaultSpace,
-		&space.PatternLimit, &space.PatternCount, &space.CreatedAt, &space.UpdatedAt,
+		&space.ID, &space.Name, &space.Description, &ownerNull, &space.DefaultSpace,
+		&space.PatternLimit, &space.PatternCount, &createdAt, &updatedAt,
 	)
 
 	if err == sql.ErrNoRows {
@@ -258,6 +260,9 @@ func (s *Storage) GetSpace(ctx context.Context, id string) (*models.Space, error
 	if err != nil {
 		return nil, err
 	}
+	space.Owner = ownerNull.String
+	space.CreatedAt = int64ToTime(createdAt)
+	space.UpdatedAt = int64ToTime(updatedAt)
 
 	return &space, nil
 }
@@ -276,17 +281,59 @@ func (s *Storage) ListSpaces(ctx context.Context) ([]*models.Space, error) {
 	var spaces []*models.Space
 	for rows.Next() {
 		var space models.Space
+		var ownerNull sql.NullString
+		var createdAt, updatedAt sql.NullInt64
 		err := rows.Scan(
-			&space.ID, &space.Name, &space.Description, &space.Owner, &space.DefaultSpace,
-			&space.PatternLimit, &space.PatternCount, &space.CreatedAt, &space.UpdatedAt,
+			&space.ID, &space.Name, &space.Description, &ownerNull, &space.DefaultSpace,
+			&space.PatternLimit, &space.PatternCount, &createdAt, &updatedAt,
 		)
 		if err != nil {
 			return nil, err
 		}
+		space.Owner = ownerNull.String
+		space.CreatedAt = int64ToTime(createdAt)
+		space.UpdatedAt = int64ToTime(updatedAt)
 		spaces = append(spaces, &space)
 	}
 
 	return spaces, rows.Err()
+}
+
+// UpdateSpace updates an existing space.
+func (s *Storage) UpdateSpace(ctx context.Context, space *models.Space) error {
+	space.UpdatedAt = time.Now()
+
+	_, err := s.db.db.ExecContext(ctx, `
+		UPDATE spaces 
+		SET name = ?, description = ?, owner = ?, is_default = ?, 
+		    pattern_limit = ?, pattern_count = ?, updated_at = ?
+		WHERE id = ?
+	`, space.Name, space.Description, space.Owner, boolToInt(space.DefaultSpace),
+		space.PatternLimit, space.PatternCount, space.UpdatedAt.Unix(), space.ID)
+
+	if err != nil {
+		return fmt.Errorf("failed to update space: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteSpace deletes a space by ID.
+func (s *Storage) DeleteSpace(ctx context.Context, id string) error {
+	result, err := s.db.db.ExecContext(ctx, `DELETE FROM spaces WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete space: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("space not found: %s", id)
+	}
+
+	return nil
 }
 
 // BeginTx starts a new transaction

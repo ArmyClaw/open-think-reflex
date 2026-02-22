@@ -143,14 +143,14 @@ func TestDeletePattern_NotFound(t *testing.T) {
 
 func TestListSpaces_Empty(t *testing.T) {
 	storage := setupTestStorage(t)
-	err := listSpaces(storage)
+	err := ListSpaces(storage)
 	assert.NoError(t, err)
 }
 
 func TestCreateSpace(t *testing.T) {
 	storage := setupTestStorage(t)
 
-	err := createSpace(storage, "test-space", "Test space description")
+	err := CreateSpace(storage, "test-space", "Test space description")
 	assert.NoError(t, err)
 }
 

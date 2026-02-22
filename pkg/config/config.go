@@ -26,6 +26,9 @@ type Config struct {
 	// Features
 	Features FeaturesConfig `json:"features"`
 	
+	// Space (v2.0)
+	CurrentSpace string `json:"current_space"`
+	
 	// loaded from file
 	filepath string
 }

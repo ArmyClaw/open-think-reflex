@@ -80,6 +80,12 @@ type Storage interface {
 	// ListSpaces retrieves all spaces in the system.
 	ListSpaces(ctx context.Context) ([]*models.Space, error)
 
+	// UpdateSpace updates an existing space.
+	UpdateSpace(ctx context.Context, s *models.Space) error
+
+	// DeleteSpace deletes a space by ID.
+	DeleteSpace(ctx context.Context, id string) error
+
 	// ==================== Transaction Support ====================
 
 	// BeginTx starts a new database transaction.
