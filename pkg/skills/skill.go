@@ -2,10 +2,12 @@
 package skills
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	otrmodels "github.com/ArmyClaw/open-think-reflex/pkg/models"
+	"github.com/ArmyClaw/open-think-reflex/pkg/ai"
 )
 
 // Skill represents an AgentSkill exported from OTR.
@@ -108,5 +110,37 @@ func (s *Skill) Validate() error {
 	if s.Response == "" {
 		return fmt.Errorf("response is required")
 	}
+	return nil
+}
+
+// PolishSkill uses AI to improve the skill response content.
+// This enhances the exported skill with better formatting and clarity.
+func PolishSkill(ctx context.Context, provider ai.Provider, skill *Skill) error {
+	if provider == nil {
+		return fmt.Errorf("AI provider is required")
+	}
+
+	polishPrompt := fmt.Sprintf(`Improve the following AgentSkill response content. 
+Make it more clear, well-structured, and professional. Keep the same meaning but enhance readability.
+
+Skill Name: %s
+Current Response:
+%s
+
+Return only the improved response content, without explanations.`, skill.Name, skill.Response)
+
+	req := &ai.Request{
+		Prompt:    polishPrompt,
+		MaxTokens: 2048,
+		Temperature: 0.7,
+		System:    "You are an expert at improving technical documentation and responses.",
+	}
+
+	resp, err := provider.Generate(ctx, req)
+	if err != nil {
+		return fmt.Errorf("failed to polish skill: %w", err)
+	}
+
+	skill.Response = resp.Content
 	return nil
 }
