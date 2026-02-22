@@ -4,33 +4,28 @@
 
 ---
 
-## 🚀 Phase 8: 项目空间 (v2.0) (2026-02-22 10:45)
+## 🚀 Phase 8: 项目空间 (v2.0) (2026-02-22 10:50)
 
 ### 项目状态
 - **版本**: v2.0 (开发中)
-- **当前迭代**: Iter 68 ✅ 完成
+- **当前迭代**: Iter 69 ✅ 完成
 - **阶段**: Phase 8 - 项目空间
 
-### Iter 68 完成 ✅ (2026-02-22 10:45)
-- Space 切换逻辑 - 切换 Space 后配置持久化
-- 更新 internal/config/config.go:
-  - 添加 CurrentSpace 字段到 Config 结构
-  - 添加 GetCurrentSpace/SetCurrentSpace 方法
-- 更新 internal/cli/commands/commands.go:
-  - 修改 UseSpace 函数接收配置和加载器参数
-  - 实现 Space 切换后保存到配置文件
-  - 修改 BuildCommands 函数签名
-- 更新 cmd/cli/main.go:
-  - 修改 loadConfig 返回 Loader
-  - 修改 buildCommands 传入配置和加载器
-  - 更新 space use 命令调用
+### Iter 69 完成 ✅ (2026-02-22 10:50)
+- 默认 Space 处理
+- 更新 internal/data/sqlite/database.go:
+  - InitDefaultSpaces 添加 owner 字段
+- 更新 internal/data/sqlite/storage.go:
+  - 添加 SetDefaultSpace 方法
+  - 添加 GetDefaultSpace 方法
 - 更新 pkg/contracts/storage.go:
-  - 添加 SpaceID 字段到 ListOptions 结构
+  - 添加 SetDefaultSpace 和 GetDefaultSpace 接口
+- 添加 `otr space default <id>` 命令
 - 编译通过，测试通过 (18/18 packages)
-- 功能验证：`otr space use global` 成功切换并保存配置
+- 已推送到 GitHub
 
 ### 下一步
-- Iter 69: 默认 Space 处理
+- Iter 70: Space 统计
 
 ---
 
