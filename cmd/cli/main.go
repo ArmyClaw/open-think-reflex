@@ -499,6 +499,32 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 						return unlinkPatternFromNote(storage, c.String("note"), c.String("pattern"))
 					},
 				},
+				{
+					Name:  "update",
+					Usage: "Update a note",
+					Flags: []cli.Flag{
+						&cli.StringFlag{
+							Name:     "id",
+							Required: true,
+							Usage:    "Note ID",
+						},
+						&cli.StringFlag{
+							Name:  "title",
+							Usage: "New title",
+						},
+						&cli.StringFlag{
+							Name:  "content",
+							Usage: "New content",
+						},
+						&cli.StringFlag{
+							Name:  "category",
+							Usage: "New category (thought/idea/todo/memory/question/note)",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						return updateNote(storage, c.String("id"), c.String("title"), c.String("content"), c.String("category"))
+					},
+				},
 			},
 		},
 		{
@@ -1295,6 +1321,37 @@ func searchNotes(storage *sqlite.Storage, query string) error {
 		fmt.Printf("  %s  %s (%s)\n", n.ID[:min(8, len(n.ID))], n.Title, n.Category)
 	}
 
+	return nil
+}
+
+// updateNote updates an existing note
+func updateNote(storage *sqlite.Storage, noteID, title, content, category string) error {
+	if noteID == "" {
+		return fmt.Errorf("note ID required")
+	}
+
+	ctx := context.Background()
+	note, err := storage.GetNote(ctx, noteID)
+	if err != nil {
+		return fmt.Errorf("note not found: %w", err)
+	}
+
+	// Update fields
+	if title != "" {
+		note.Title = title
+	}
+	if content != "" {
+		note.Content = content
+	}
+	if category != "" {
+		note.Category = category
+	}
+
+	if err := storage.UpdateNote(ctx, note); err != nil {
+		return fmt.Errorf("failed to update note: %w", err)
+	}
+
+	fmt.Printf("Note updated: %s\n", noteID)
 	return nil
 }
 
