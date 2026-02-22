@@ -13,6 +13,10 @@ type Space struct {
 	// Owner (for multi-user support in v2.0)
 	Owner string `json:"owner,omitempty" db:"owner"`
 
+	// Collaboration (reserved for v2.1+)
+	// Permission: read/write/admin (future multi-user support)
+	// ShareCode: public share code (future)
+
 	// Settings
 	DefaultSpace bool `json:"default_space" db:"is_default"`
 	PatternLimit int  `json:"pattern_limit" db:"pattern_limit"`
