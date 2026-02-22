@@ -1454,8 +1454,20 @@ func exportSkill(storage *sqlite.Storage, patternID, outputPath string) error {
 	// Convert to skill
 	skill := skills.ConvertPatternToSkill(pattern, spaceName)
 
-	// TODO: Add YAML marshaling and AI polish option
-	// For now, output as JSON
+	// Export based on file extension
+	exporter := export.NewExporter()
+	var exportErr error
+	
+	if strings.HasSuffix(strings.ToLower(outputPath), ".yaml") || strings.HasSuffix(outputPath, ".yml") {
+		exportErr = exporter.ExportSkillToYAML(skill, outputPath)
+	} else {
+		exportErr = exporter.ExportSkillToJSON(skill, outputPath)
+	}
+
+	if exportErr != nil {
+		return fmt.Errorf("failed to export: %w", exportErr)
+	}
+
 	fmt.Printf("Exported skill: %s\n", skill.Name)
 	fmt.Printf("Trigger: %s\n", skill.Trigger)
 	fmt.Printf("Output: %s\n", outputPath)

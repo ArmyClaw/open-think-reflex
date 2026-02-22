@@ -326,3 +326,17 @@ func (e *Exporter) ExportSkillToJSON(skill *skills.Skill, filepath string) error
 
 	return nil
 }
+
+// ExportSkillToYAML exports a single skill to a YAML file.
+func (e *Exporter) ExportSkillToYAML(skill *skills.Skill, filepath string) error {
+	data, err := yaml.Marshal(skill)
+	if err != nil {
+		return fmt.Errorf("failed to marshal skill: %w", err)
+	}
+
+	if err := os.WriteFile(filepath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	return nil
+}
