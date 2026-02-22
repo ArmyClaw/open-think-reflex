@@ -4,30 +4,41 @@
 
 ---
 
-## 🚀 Phase 8: 项目空间 (v2.0) (2026-02-22 09:32)
+## 🚀 Phase 8: 项目空间 (v2.0) (2026-02-22 10:10)
 
 ### 项目状态
 - **版本**: v2.0 (开发中)
-- **当前迭代**: Iter 66 ✅ 完成
+- **当前迭代**: Iter 67 ✅ 完成
 - **阶段**: Phase 8 - 项目空间
 
-### Iter 66 完成 ✅ (2026-02-22 09:32)
-- Space 模型扩展 - 添加 Owner 字段
-- 更新 pkg/models/space.go:
-  - 添加 Owner 字段 (string) 用于多用户支持
+### Iter 67 完成 ✅ (2026-02-22 10:10)
+- Space CRUD 命令 - 完整的空间管理 CLI
+- 新增命令:
+  - `otr space list` - 列出所有空间
+  - `otr space create --name --description` - 创建新空间
+  - `otr space show <id>` - 查看空间详情
+  - `otr space delete <id>` - 删除空间
+  - `otr space use <id>` - 切换到指定空间
+- 更新 cmd/cli/main.go:
+  - 注册 space 命令及其子命令
+  - 导入 commands 包
+- 更新 internal/cli/commands/commands.go:
+  - 导出 ListSpaces, CreateSpace, ShowSpace, DeleteSpace, UseSpace 函数
+  - 实现完整的空间管理逻辑
 - 更新 internal/data/sqlite/storage.go:
-  - CreateSpace: 添加 owner 参数
-  - GetSpace: 查询 owner 字段
-  - ListSpaces: 查询 owner 字段
-- 更新 internal/data/sqlite/database.go:
-  - 迁移脚本添加 owner 列
-- 更新 doc/architecture/SCHEMA.md:
-  - spaces 表添加 owner 字段
+  - 实现 UpdateSpace 和 DeleteSpace
+  - 修复 NULL 值处理 (owner, timestamps)
+- 更新 pkg/contracts/storage.go:
+  - 添加 UpdateSpace 和 DeleteSpace 接口
+- 更新 pkg/config/config.go:
+  - 添加 CurrentSpace 字段
+- 更新 pkg/models/space.go:
+  - DefaultSpaces 添加 Owner 字段
 - 编译通过，测试通过 (18/18 packages)
 - 已推送到 GitHub
 
 ### 下一步
-- Iter 67: Space CRUD 命令
+- Iter 68: Space 切换逻辑
 
 ---
 
