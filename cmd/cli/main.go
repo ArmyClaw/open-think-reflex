@@ -211,6 +211,10 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 							Name:  "project",
 							Usage: "New project",
 						},
+						&cli.StringFlag{
+							Name:  "tags",
+							Usage: "Comma-separated tags",
+						},
 						&cli.Float64Flag{
 							Name:  "strength",
 							Usage: "Set strength (0-100)",
@@ -221,7 +225,7 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 						},
 					},
 					Action: func(c *cli.Context) error {
-						return updatePattern(storage, c.String("id"), c.String("trigger"), c.String("response"), c.String("project"), c.Float64("strength"), c.Float64("threshold"))
+						return updatePattern(storage, c.String("id"), c.String("trigger"), c.String("response"), c.String("project"), c.String("tags"), c.Float64("strength"), c.Float64("threshold"))
 					},
 				},
 				{
@@ -796,7 +800,7 @@ func movePattern(storage *sqlite.Storage, patternID, spaceID string) error {
 	return nil
 }
 
-func updatePattern(storage *sqlite.Storage, id, trigger, response, project string, strength, threshold float64) error {
+func updatePattern(storage *sqlite.Storage, id, trigger, response, project, tagsStr string, strength, threshold float64) error {
 	if id == "" {
 		return fmt.Errorf("pattern ID required")
 	}
@@ -816,6 +820,13 @@ func updatePattern(storage *sqlite.Storage, id, trigger, response, project strin
 	}
 	if project != "" {
 		pattern.Project = project
+	}
+	if tagsStr != "" {
+		tags := strings.Split(tagsStr, ",")
+		for i := range tags {
+			tags[i] = strings.TrimSpace(tags[i])
+		}
+		pattern.Tags = tags
 	}
 	if strength > 0 {
 		pattern.Strength = strength
