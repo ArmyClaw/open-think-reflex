@@ -1,26 +1,30 @@
 # Open-Think-Reflex Progress Tracker
 
-> **Last Updated**: 2026-02-22 14:30
+> **Last Updated**: 2026-02-22 14:45
 
 ---
 
-## 🚀 Phase 13: 优化完善 (2026-02-22 14:30)
+## 🚀 Phase 13: 优化完善 (2026-02-22 14:45)
 
 ### 项目状态
 - **版本**: v2.0 (开发中)
-- **当前迭代**: Iter 94 ✅ 完成
+- **当前迭代**: Iter 95 ✅ 完成
 - **阶段**: Phase 13 - 优化完善
 
 ### Iter 94 完成 ✅ (2026-02-22 14:30)
-- TUI 优化
-- 更新 internal/ui/app.go:
-  - 更新 useSelectedResponse 函数说明
-  - 明确 Clipboard 功能需要终端支持
+
+### Iter 95 完成 ✅ (2026-02-22 14:45)
+- YAML 导出功能
+- 更新 pkg/export/exporter.go:
+  - ExportSkillToYAML: 导出单个 Skill 到 YAML 文件
+- 更新 cmd/cli/main.go:
+  - exportSkill 函数支持自动识别 .yaml/.yml 扩展名
+  - 根据文件扩展名自动选择 JSON 或 YAML 格式
 - 编译通过，测试通过
 - 已推送到 GitHub
 
 ### 下一步
-- Iter 95: 待规划
+- Iter 96: 待规划
 
 ---
 
