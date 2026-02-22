@@ -123,7 +123,7 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 		{
 			Name:  "interactive",
 			Usage: "Launch interactive TUI mode",
-			Aliases: []string{"tui", "ui"},
+			Aliases: []string{"tui", "ui", "i"},
 			Action: func(c *cli.Context) error {
 				return runInteractive(storage)
 			},
@@ -574,6 +574,7 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 		{
 			Name:  "doctor",
 			Usage: "Run diagnostics and health checks",
+			Aliases: []string{"diag"},
 			Action: func(c *cli.Context) error {
 				return runDiagnostics(storage)
 			},
