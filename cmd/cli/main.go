@@ -411,6 +411,44 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 						return searchNotes(storage, c.String("query"))
 					},
 				},
+				{
+					Name:  "link",
+					Usage: "Link a pattern to a note",
+					Flags: []cli.Flag{
+						&cli.StringFlag{
+							Name:     "note",
+							Required: true,
+							Usage:    "Note ID",
+						},
+						&cli.StringFlag{
+							Name:     "pattern",
+							Required: true,
+							Usage:    "Pattern ID",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						return linkPatternToNote(storage, c.String("note"), c.String("pattern"))
+					},
+				},
+				{
+					Name:  "unlink",
+					Usage: "Unlink a pattern from a note",
+					Flags: []cli.Flag{
+						&cli.StringFlag{
+							Name:     "note",
+							Required: true,
+							Usage:    "Note ID",
+						},
+						&cli.StringFlag{
+							Name:     "pattern",
+							Required: true,
+							Usage:    "Pattern ID",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						return unlinkPatternFromNote(storage, c.String("note"), c.String("pattern"))
+					},
+				},
 			},
 		},
 		{
@@ -937,6 +975,64 @@ func searchNotes(storage *sqlite.Storage, query string) error {
 		fmt.Printf("  %s  %s (%s)\n", n.ID[:min(8, len(n.ID))], n.Title, n.Category)
 	}
 
+	return nil
+}
+
+func linkPatternToNote(storage *sqlite.Storage, noteID, patternID string) error {
+	if noteID == "" {
+		return fmt.Errorf("note ID required")
+	}
+	if patternID == "" {
+		return fmt.Errorf("pattern ID required")
+	}
+
+	ctx := context.Background()
+
+	// Get note
+	note, err := storage.GetNote(ctx, noteID)
+	if err != nil {
+		return fmt.Errorf("note not found: %w", err)
+	}
+
+	// Verify pattern exists
+	_, err = storage.GetPattern(ctx, patternID)
+	if err != nil {
+		return fmt.Errorf("pattern not found: %w", err)
+	}
+
+	// Add pattern link
+	note.AddPattern(patternID)
+	if err := storage.UpdateNote(ctx, note); err != nil {
+		return fmt.Errorf("failed to update note: %w", err)
+	}
+
+	fmt.Printf("Linked pattern '%s' to note '%s'\n", patternID[:min(8, len(patternID))], note.Title)
+	return nil
+}
+
+func unlinkPatternFromNote(storage *sqlite.Storage, noteID, patternID string) error {
+	if noteID == "" {
+		return fmt.Errorf("note ID required")
+	}
+	if patternID == "" {
+		return fmt.Errorf("pattern ID required")
+	}
+
+	ctx := context.Background()
+
+	// Get note
+	note, err := storage.GetNote(ctx, noteID)
+	if err != nil {
+		return fmt.Errorf("note not found: %w", err)
+	}
+
+	// Remove pattern link
+	note.RemovePattern(patternID)
+	if err := storage.UpdateNote(ctx, note); err != nil {
+		return fmt.Errorf("failed to update note: %w", err)
+	}
+
+	fmt.Printf("Unlinked pattern '%s' from note '%s'\n", patternID[:min(8, len(patternID))], note.Title)
 	return nil
 }
 

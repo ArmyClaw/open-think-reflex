@@ -29,6 +29,9 @@ type Note struct {
 	WordCount int        `json:"word_count" db:"word_count"` // Content word count
 	CharCount int        `json:"char_count" db:"char_count"` // Content character count
 	LastViewed *time.Time `json:"last_viewed,omitempty" db:"last_viewed"` // Last viewed timestamp
+
+	// Linked Patterns (v2.0)
+	PatternIDs []string `json:"pattern_ids,omitempty" db:"-"` // Related Pattern IDs
 }
 
 // NoteCategory constants
@@ -83,4 +86,35 @@ func (n *Note) Preview(maxLen int) string {
 		return n.Content
 	}
 	return n.Content[:maxLen] + "..."
+}
+
+// AddPattern adds a pattern ID to the note
+func (n *Note) AddPattern(patternID string) {
+	for _, id := range n.PatternIDs {
+		if id == patternID {
+			return // Already linked
+		}
+	}
+	n.PatternIDs = append(n.PatternIDs, patternID)
+}
+
+// RemovePattern removes a pattern ID from the note
+func (n *Note) RemovePattern(patternID string) {
+	var newIDs []string
+	for _, id := range n.PatternIDs {
+		if id != patternID {
+			newIDs = append(newIDs, id)
+		}
+	}
+	n.PatternIDs = newIDs
+}
+
+// HasPattern checks if a pattern is linked to this note
+func (n *Note) HasPattern(patternID string) bool {
+	for _, id := range n.PatternIDs {
+		if id == patternID {
+			return true
+		}
+	}
+	return false
 }
