@@ -481,6 +481,13 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 			},
 		},
 		{
+			Name:  "summary",
+			Usage: "Show overall statistics summary",
+			Action: func(c *cli.Context) error {
+				return showSummary(storage)
+			},
+		},
+		{
 			Name:  "version",
 			Usage: "Show version information",
 			Action: func(c *cli.Context) error {
@@ -998,6 +1005,61 @@ func showPatternStats(storage *sqlite.Storage) error {
 			fmt.Printf("  %s: %d\n", tag, count)
 		}
 	}
+
+	return nil
+}
+
+// showSummary displays overall system summary
+func showSummary(storage *sqlite.Storage) error {
+	ctx := context.Background()
+
+	// Get patterns count
+	patterns, err := storage.ListPatterns(ctx, contracts.ListOptions{Limit: 10000})
+	if err != nil {
+		return err
+	}
+
+	// Get spaces count
+	spaces, err := storage.ListSpaces(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Calculate stats
+	totalPatterns := len(patterns)
+	highStrength := 0
+	mediumStrength := 0
+	lowStrength := 0
+
+	for _, p := range patterns {
+		if p.Strength >= 70 {
+			highStrength++
+		} else if p.Strength >= 40 {
+			mediumStrength++
+		} else {
+			lowStrength++
+		}
+	}
+
+	// Print summary
+	fmt.Println("╔═══════════════════════════════════════╗")
+	fmt.Println("║   Open-Think-Reflex Summary           ║")
+	fmt.Println("╚═══════════════════════════════════════╝")
+	fmt.Printf("\n📊 Patterns: %d total\n", totalPatterns)
+	fmt.Printf("   • High (≥70): %d\n", highStrength)
+	fmt.Printf("   • Medium (40-69): %d\n", mediumStrength)
+	fmt.Printf("   • Low (<40): %d\n\n", lowStrength)
+
+	fmt.Printf("📁 Spaces: %d\n\n", len(spaces))
+
+	fmt.Println("🧠 Commands:")
+	fmt.Println("   otr interactive - Launch TUI")
+	fmt.Println("   otr pattern    - Manage patterns")
+	fmt.Println("   otr space     - Manage spaces")
+	fmt.Println("   otr note      - Manage notes")
+	fmt.Println("   otr skill     - Export skills")
+	fmt.Println("   otr share     - Share patterns")
+	fmt.Println()
 
 	return nil
 }
