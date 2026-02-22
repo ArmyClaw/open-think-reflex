@@ -86,6 +86,12 @@ type Storage interface {
 	// DeleteSpace deletes a space by ID.
 	DeleteSpace(ctx context.Context, id string) error
 
+	// SetDefaultSpace sets a space as the default space.
+	SetDefaultSpace(ctx context.Context, id string) error
+
+	// GetDefaultSpace returns the default space.
+	GetDefaultSpace(ctx context.Context) (*models.Space, error)
+
 	// ==================== Transaction Support ====================
 
 	// BeginTx starts a new database transaction.

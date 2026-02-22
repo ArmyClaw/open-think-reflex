@@ -266,6 +266,14 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 						return commands.UseSpace(storage, cfg, loader, c.Args().First())
 					},
 				},
+				{
+					Name:      "default",
+					Usage:     "Set a space as default",
+					ArgsUsage: "<space_id>",
+					Action: func(c *cli.Context) error {
+						return commands.SetDefaultSpace(storage, c.Args().First())
+					},
+				},
 			},
 		},
 		{

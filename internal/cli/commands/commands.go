@@ -382,6 +382,29 @@ func UseSpace(storage *sqlite.Storage, cfg *config.Config, loader *config.Loader
 	return nil
 }
 
+// SetDefaultSpace sets a space as the default space.
+func SetDefaultSpace(storage *sqlite.Storage, spaceID string) error {
+	if spaceID == "" {
+		return fmt.Errorf("space ID is required")
+	}
+	
+	ctx := context.Background()
+	
+	// Verify space exists
+	_, err := storage.GetSpace(ctx, spaceID)
+	if err != nil {
+		return fmt.Errorf("failed to get space: %w", err)
+	}
+
+	// Set as default
+	if err := storage.SetDefaultSpace(ctx, spaceID); err != nil {
+		return fmt.Errorf("failed to set default space: %w", err)
+	}
+
+	fmt.Printf("Space '%s' is now the default\n", spaceID)
+	return nil
+}
+
 // generateSpaceID generates a new space ID.
 func generateSpaceID() string {
 	return fmt.Sprintf("space-%d", time.Now().UnixNano())

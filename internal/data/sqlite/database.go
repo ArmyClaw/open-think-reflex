@@ -193,9 +193,9 @@ func (d *Database) InitDefaultSpaces(ctx context.Context) error {
 	spaces := models.DefaultSpaces()
 	for _, space := range spaces {
 		_, err := d.db.ExecContext(ctx, `
-			INSERT OR IGNORE INTO spaces (id, name, description, is_default, pattern_limit, pattern_count, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		`, space.ID, space.Name, space.Description, boolToInt(space.DefaultSpace),
+			INSERT OR IGNORE INTO spaces (id, name, description, owner, is_default, pattern_limit, pattern_count, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, space.ID, space.Name, space.Description, space.Owner, boolToInt(space.DefaultSpace),
 			space.PatternLimit, space.PatternCount, space.CreatedAt.Unix(), space.UpdatedAt.Unix())
 		if err != nil {
 			return fmt.Errorf("failed to init space %s: %w", space.ID, err)

@@ -348,6 +348,51 @@ func (s *Storage) DeleteSpace(ctx context.Context, id string) error {
 	return nil
 }
 
+// SetDefaultSpace sets a space as the default space.
+func (s *Storage) SetDefaultSpace(ctx context.Context, id string) error {
+	// First, unset all other defaults
+	_, err := s.db.db.ExecContext(ctx, `UPDATE spaces SET is_default = 0`)
+	if err != nil {
+		return fmt.Errorf("failed to unset default spaces: %w", err)
+	}
+
+	// Then set the specified space as default
+	_, err = s.db.db.ExecContext(ctx, `UPDATE spaces SET is_default = 1 WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("failed to set default space: %w", err)
+	}
+
+	return nil
+}
+
+// GetDefaultSpace returns the default space.
+func (s *Storage) GetDefaultSpace(ctx context.Context) (*models.Space, error) {
+	var space models.Space
+	var ownerNull sql.NullString
+	var createdAt, updatedAt sql.NullInt64
+
+	err := s.db.db.QueryRowContext(ctx, `
+		SELECT id, name, description, owner, is_default, pattern_limit, pattern_count, created_at, updated_at
+		FROM spaces WHERE is_default = 1
+	`).Scan(
+		&space.ID, &space.Name, &space.Description, &ownerNull, &space.DefaultSpace,
+		&space.PatternLimit, &space.PatternCount, &createdAt, &updatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		// Fallback to "global" if no default is set
+		return s.GetSpace(ctx, "global")
+	}
+	if err != nil {
+		return nil, err
+	}
+	space.Owner = ownerNull.String
+	space.CreatedAt = int64ToTime(createdAt)
+	space.UpdatedAt = int64ToTime(updatedAt)
+
+	return &space, nil
+}
+
 // BeginTx starts a new transaction
 func (s *Storage) BeginTx(ctx context.Context) (contracts.Transaction, error) {
 	tx, err := s.db.db.BeginTx(ctx, nil)
