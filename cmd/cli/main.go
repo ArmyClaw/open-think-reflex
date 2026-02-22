@@ -49,6 +49,27 @@ func Run() error {
 		Name:    "otr",
 		Version: Version,
 		Usage:   "Open-Think-Reflex: AI Input Accelerator",
+		Description: `A CLI tool for managing reflex patterns and accelerating AI interactions.
+
+Quick Start:
+  otr interactive          Launch interactive TUI mode
+  otr pattern create --trigger "hello" --response "Hello! How can I help?"
+  otr pattern list        List all patterns
+  otr space list         List all spaces
+  otr note create --title "My Note" --content "Note content"
+
+Examples:
+  # Create a pattern with tags
+  otr pattern create --trigger "api" --response "API response" --tags "backend,code"
+
+  # List patterns by tag
+  otr pattern list --tag "backend"
+
+  # Export patterns
+  otr backup --output backup.json
+
+  # Share a pattern
+  otr share create --id <pattern-id>`,
 		Commands: buildCommands(storage, cfg, loader),
 		Action: func(c *cli.Context) error {
 			fmt.Println("Open-Think-Reflex v" + Version)
