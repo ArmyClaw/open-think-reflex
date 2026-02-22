@@ -3,6 +3,8 @@ package models
 import (
 	"errors"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // Note represents a thought/note in the system.
@@ -46,6 +48,19 @@ const (
 
 // ErrInvalidNote represents an invalid note error
 var ErrInvalidNote = errors.New("invalid note")
+
+// NewNote creates a new note with default values
+func NewNote(title, content string) *Note {
+	now := time.Now()
+	return &Note{
+		ID:        uuid.New().String(),
+		Title:     title,
+		Content:   content,
+		Category:  CategoryNote,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+}
 
 // Validate checks if the note is valid
 func (n *Note) Validate() error {

@@ -245,6 +245,13 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 						return decayPatterns(storage)
 					},
 				},
+				{
+					Name:  "stats",
+					Usage: "Show pattern statistics",
+					Action: func(c *cli.Context) error {
+						return showPatternStats(storage)
+					},
+				},
 			},
 		},
 		{
@@ -887,6 +894,87 @@ func decayPatterns(storage *sqlite.Storage) error {
 	}
 
 	fmt.Printf("Total patterns decayed: %d\n", decayedCount)
+	return nil
+}
+
+// showPatternStats displays pattern statistics
+func showPatternStats(storage *sqlite.Storage) error {
+	ctx := context.Background()
+	patterns, err := storage.ListPatterns(ctx, contracts.ListOptions{Limit: 10000})
+	if err != nil {
+		return err
+	}
+
+	if len(patterns) == 0 {
+		fmt.Println("No patterns found")
+		return nil
+	}
+
+	// Calculate stats
+	total := len(patterns)
+	highStrength := 0
+	mediumStrength := 0
+	lowStrength := 0
+	activeCount := 0
+	decayedCount := 0
+
+	spaceCounts := make(map[string]int)
+	tagCounts := make(map[string]int)
+
+	for _, p := range patterns {
+		// Strength distribution
+		if p.Strength >= 70 {
+			highStrength++
+		} else if p.Strength >= 40 {
+			mediumStrength++
+		} else {
+			lowStrength++
+		}
+
+		// Active/Decayed
+		if p.Strength >= p.Threshold {
+			activeCount++
+		} else {
+			decayedCount++
+		}
+
+		// Space distribution
+		spaceID := p.SpaceID
+		if spaceID == "" {
+			spaceID = "global"
+		}
+		spaceCounts[spaceID]++
+
+		// Tag distribution
+		for _, tag := range p.Tags {
+			tagCounts[tag]++
+		}
+	}
+
+	// Print stats
+	fmt.Printf("=== Pattern Statistics ===\n\n")
+	fmt.Printf("Total Patterns: %d\n", total)
+	fmt.Printf("  Active: %d\n", activeCount)
+	fmt.Printf("  Below Threshold: %d\n\n", decayedCount)
+
+	fmt.Printf("Strength Distribution:\n")
+	fmt.Printf("  High (≥70): %d\n", highStrength)
+	fmt.Printf("  Medium (40-69): %d\n", mediumStrength)
+	fmt.Printf("  Low (<40): %d\n\n", lowStrength)
+
+	fmt.Printf("Spaces:\n")
+	for space, count := range spaceCounts {
+		fmt.Printf("  %s: %d patterns\n", space, count)
+	}
+	fmt.Println()
+
+	if len(tagCounts) > 0 {
+		fmt.Printf("Top Tags:\n")
+		for tag, count := range tagCounts {
+			fmt.Printf("  %s: %d\n", tag, count)
+		}
+	}
+
 	return nil
 }
 
