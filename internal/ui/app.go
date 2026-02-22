@@ -412,10 +412,10 @@ func (a *App) useSelectedResponse() {
 	result := a.thoughtChain.GetSelectedResult()
 	if result != nil {
 		a.output.SetFormattedOutput("Response Copied!", 
-			fmt.Sprintf("✓ Copied to clipboard:\n\n%s", result.Pattern.Response))
+			fmt.Sprintf("✓ Response ready:\n\n%s", result.Pattern.Response))
 		
-		// TODO: Implement actual clipboard copy
-		// For now, just show a success message
+		// Note: Actual clipboard copy requires terminal with clipboard support
+		// For TUI apps, the response is displayed for manual copy
 	}
 }
 
