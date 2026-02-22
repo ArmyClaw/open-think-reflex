@@ -95,6 +95,26 @@ type Storage interface {
 	// GetDefaultSpace returns the default space.
 	GetDefaultSpace(ctx context.Context) (*models.Space, error)
 
+	// ==================== Note Operations (Phase 10) ====================
+
+	// SaveNote creates or updates a note.
+	SaveNote(ctx context.Context, note *models.Note) error
+
+	// GetNote retrieves a note by its ID.
+	GetNote(ctx context.Context, id string) (*models.Note, error)
+
+	// ListNotes retrieves notes matching the given filter options.
+	ListNotes(ctx context.Context, opts ListOptions) ([]*models.Note, error)
+
+	// DeleteNote removes a note by its ID.
+	DeleteNote(ctx context.Context, id string) error
+
+	// UpdateNote updates an existing note.
+	UpdateNote(ctx context.Context, note *models.Note) error
+
+	// SearchNotes performs a full-text search on title and content.
+	SearchNotes(ctx context.Context, query string, opts ListOptions) ([]*models.Note, error)
+
 	// ==================== Transaction Support ====================
 
 	// BeginTx starts a new database transaction.

@@ -11,6 +11,7 @@ import (
 
 	"github.com/ArmyClaw/open-think-reflex/pkg/contracts"
 	"github.com/ArmyClaw/open-think-reflex/pkg/models"
+	"github.com/google/uuid"
 )
 
 // Storage implements contracts.Storage using SQLite
@@ -874,6 +875,233 @@ func (s *Storage) BatchGetPatterns(ctx context.Context, ids []string) ([]*models
 	}
 
 	return patterns, rows.Err()
+}
+
+// ==================== Note Operations (Phase 10) ====================
+
+// SaveNote creates or updates a note in storage.
+func (s *Storage) SaveNote(ctx context.Context, note *models.Note) error {
+	if note.ID == "" {
+		note.ID = uuid.New().String()
+	}
+	note.CalculateStats()
+	now := time.Now()
+	note.CreatedAt = now
+	note.UpdatedAt = now
+
+	tagsJSON, _ := json.Marshal(note.Tags)
+
+	_, err := s.db.db.ExecContext(ctx, `
+		INSERT INTO notes (id, title, content, space_id, tags, is_pinned, category, word_count, char_count, last_viewed_at, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			title = excluded.title,
+			content = excluded.content,
+			space_id = excluded.space_id,
+			tags = excluded.tags,
+			is_pinned = excluded.is_pinned,
+			category = excluded.category,
+			word_count = excluded.word_count,
+			char_count = excluded.char_count,
+			last_viewed_at = excluded.last_viewed_at,
+			updated_at = excluded.updated_at
+	`,
+		note.ID, note.Title, note.Content, note.SpaceID, tagsJSON, note.IsPinned, note.Category,
+		note.WordCount, note.CharCount, note.LastViewed, note.CreatedAt.Unix(), note.UpdatedAt.Unix())
+
+	return err
+}
+
+// GetNote retrieves a note by its ID.
+func (s *Storage) GetNote(ctx context.Context, id string) (*models.Note, error) {
+	var note models.Note
+	var tagsJSON []byte
+	var lastViewed sql.NullInt64
+
+	err := s.db.db.QueryRowContext(ctx, `
+		SELECT id, title, content, space_id, tags, is_pinned, category, word_count, char_count, last_viewed_at, created_at, updated_at
+		FROM notes WHERE id = ?
+	`, id).Scan(
+		&note.ID, &note.Title, &note.Content, &note.SpaceID, &tagsJSON,
+		&note.IsPinned, &note.Category, &note.WordCount, &note.CharCount, &lastViewed,
+		&note.CreatedAt, &note.UpdatedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("note not found: %s", id)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	json.Unmarshal(tagsJSON, &note.Tags)
+	if lastViewed.Valid {
+		t := time.Unix(lastViewed.Int64, 0)
+		note.LastViewed = &t
+	}
+
+	return &note, nil
+}
+
+// ListNotes retrieves notes matching the given filter options.
+func (s *Storage) ListNotes(ctx context.Context, opts contracts.ListOptions) ([]*models.Note, error) {
+	query := "SELECT id, title, content, space_id, tags, is_pinned, category, word_count, char_count, last_viewed_at, created_at, updated_at FROM notes WHERE 1=1"
+	args := []interface{}{}
+
+	if opts.SpaceID != "" {
+		query += " AND space_id = ?"
+		args = append(args, opts.SpaceID)
+	}
+
+	if opts.Project != "" { // Use Project as category filter
+		query += " AND category = ?"
+		args = append(args, opts.Project)
+	}
+
+	query += " ORDER BY is_pinned DESC, updated_at DESC"
+
+	if opts.Limit > 0 {
+		query += fmt.Sprintf(" LIMIT %d", opts.Limit)
+	}
+	if opts.Offset > 0 {
+		query += fmt.Sprintf(" OFFSET %d", opts.Offset)
+	}
+
+	rows, err := s.db.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var notes []*models.Note
+	for rows.Next() {
+		var note models.Note
+		var tagsJSON []byte
+		var lastViewed sql.NullInt64
+
+		err := rows.Scan(
+			&note.ID, &note.Title, &note.Content, &note.SpaceID, &tagsJSON,
+			&note.IsPinned, &note.Category, &note.WordCount, &note.CharCount, &lastViewed,
+			&note.CreatedAt, &note.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+
+		json.Unmarshal(tagsJSON, &note.Tags)
+		if lastViewed.Valid {
+			t := time.Unix(lastViewed.Int64, 0)
+			note.LastViewed = &t
+		}
+
+		notes = append(notes, &note)
+	}
+
+	return notes, rows.Err()
+}
+
+// DeleteNote removes a note by its ID.
+func (s *Storage) DeleteNote(ctx context.Context, id string) error {
+	result, err := s.db.db.ExecContext(ctx, "DELETE FROM notes WHERE id = ?", id)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("note not found")
+	}
+
+	return nil
+}
+
+// UpdateNote updates an existing note.
+func (s *Storage) UpdateNote(ctx context.Context, note *models.Note) error {
+	note.CalculateStats()
+	note.UpdatedAt = time.Now()
+
+	tagsJSON, _ := json.Marshal(note.Tags)
+
+	result, err := s.db.db.ExecContext(ctx, `
+		UPDATE notes SET
+			title = ?,
+			content = ?,
+			space_id = ?,
+			tags = ?,
+			is_pinned = ?,
+			category = ?,
+			word_count = ?,
+			char_count = ?,
+			last_viewed_at = ?,
+			updated_at = ?
+		WHERE id = ?
+	`,
+		note.Title, note.Content, note.SpaceID, tagsJSON, note.IsPinned, note.Category,
+		note.WordCount, note.CharCount, note.LastViewed, note.UpdatedAt.Unix(), note.ID)
+
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("note not found")
+	}
+
+	return nil
+}
+
+// SearchNotes performs a full-text search on title and content.
+func (s *Storage) SearchNotes(ctx context.Context, query string, opts contracts.ListOptions) ([]*models.Note, error) {
+	searchQuery := "%" + query + "%"
+	sqlQuery := "SELECT id, title, content, space_id, tags, is_pinned, category, word_count, char_count, last_viewed_at, created_at, updated_at FROM notes WHERE (title LIKE ? OR content LIKE ?)"
+	args := []interface{}{searchQuery, searchQuery}
+
+	if opts.SpaceID != "" {
+		sqlQuery += " AND space_id = ?"
+		args = append(args, opts.SpaceID)
+	}
+
+	sqlQuery += " ORDER BY is_pinned DESC, updated_at DESC"
+
+	if opts.Limit > 0 {
+		sqlQuery += fmt.Sprintf(" LIMIT %d", opts.Limit)
+	}
+
+	rows, err := s.db.db.QueryContext(ctx, sqlQuery, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var notes []*models.Note
+	for rows.Next() {
+		var note models.Note
+		var tagsJSON []byte
+		var lastViewed sql.NullInt64
+
+		err := rows.Scan(
+			&note.ID, &note.Title, &note.Content, &note.SpaceID, &tagsJSON,
+			&note.IsPinned, &note.Category, &note.WordCount, &note.CharCount, &lastViewed,
+			&note.CreatedAt, &note.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+
+		json.Unmarshal(tagsJSON, &note.Tags)
+		if lastViewed.Valid {
+			t := time.Unix(lastViewed.Int64, 0)
+			note.LastViewed = &t
+		}
+
+		notes = append(notes, &note)
+	}
+
+	return notes, rows.Err()
 }
 
 
