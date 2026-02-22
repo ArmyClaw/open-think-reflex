@@ -135,6 +135,7 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 				{
 					Name:  "list",
 					Usage: "List all patterns",
+					Aliases: []string{"ls"},
 					Flags: []cli.Flag{
 						&cli.StringFlag{
 							Name:  "tag",
@@ -291,6 +292,7 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 				{
 					Name:  "list",
 					Usage: "List all spaces",
+					Aliases: []string{"ls"},
 					Action: func(c *cli.Context) error {
 						return commands.ListSpaces(storage)
 					},
@@ -398,6 +400,7 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 				{
 					Name:  "list",
 					Usage: "List all notes",
+					Aliases: []string{"ls"},
 					Flags: []cli.Flag{
 						&cli.StringFlag{
 							Name:  "space",
