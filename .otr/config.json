@@ -1,8 +1,0 @@
-{
-  "version": 1,
-  "name": "open-think-reflex",
-  "type": "go",
-  "root": ".",
-  "config": "config.example.yaml",
-  "data_dir": "~/.otr"
-}
