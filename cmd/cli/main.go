@@ -1507,17 +1507,8 @@ func runQuery(storage *sqlite.Storage, query string, threshold float64) error {
 }
 
 func runInteractive(storage *sqlite.Storage, force bool) error {
-	// Check terminal capabilities before starting TUI (skip if force flag is set)
-	if !force && !isTerminalCapable() {
-		return fmt.Errorf("interactive mode requires a capable terminal. " +
-			"Current terminal (TERM=%s) does not support TUI apps. " +
-			"Please run in a proper terminal (e.g., cmd, PowerShell, xterm, tmux) " +
-			"or use 'otr interactive --force' to try anyway",
-			os.Getenv("TERM"))
-	}
-
-	// If TERM is not set but we have /dev/tty, try to use script command
-	// This helps in containerized environments (ECS, Docker, etc.)
+	// If TERM is not set, automatically use script to create pseudo-TTY
+	// This helps in containerized environments (ECS, Docker, CI/CD)
 	if os.Getenv("TERM") == "" {
 		fmt.Println("Starting interactive mode (via script)...")
 		
@@ -1530,6 +1521,15 @@ func runInteractive(storage *sqlite.Storage, force bool) error {
 		cmd.Dir = "/home/ecs-user/.openclaw/workspace/open-think-reflex"
 		
 		return cmd.Run()
+	}
+
+	// Check terminal capabilities before starting TUI (skip if force flag is set)
+	if !force && !isTerminalCapable() {
+		return fmt.Errorf("interactive mode requires a capable terminal. " +
+			"Current terminal (TERM=%s) does not support TUI apps. " +
+			"Please run in a proper terminal (e.g., cmd, PowerShell, xterm, tmux) " +
+			"or use 'otr interactive --force' to try anyway",
+			os.Getenv("TERM"))
 	}
 
 	fmt.Println("Starting interactive mode...")
