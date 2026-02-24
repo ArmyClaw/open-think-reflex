@@ -116,6 +116,8 @@ open-think-reflex/
 
 ## 快速开始
 
+### Linux/macOS
+
 ```bash
 # 克隆项目
 git clone https://github.com/ArmyClaw/open-think-reflex.git
@@ -136,6 +138,72 @@ go build -o otr ./cmd/otr
 # 运行
 ./otr --help
 ```
+
+### Windows
+
+#### 前置要求
+
+1. **安装 Go 语言环境**
+   - 下载 Go for Windows: https://go.dev/dl/
+   - 选择 Windows MSI installer 或 ZIP 文件
+   - 安装后打开 PowerShell 验证: `go version`
+
+2. **安装 Git (可选)**
+   - 下载 Git for Windows: https://git-scm.com/download/win
+   - 或使用 Windows Terminal 自带的 Git
+
+#### 编译步骤
+
+```powershell
+# 克隆项目
+git clone https://github.com/ArmyClaw/open-think-reflex.git
+cd open-think-reflex
+
+# 编译 (PowerShell)
+go build -o otr.exe .\cmd\otr
+
+# 运行
+.\otr.exe --help
+```
+
+#### 使用 WSL (推荐)
+
+如果需要更好的体验，推荐使用 WSL:
+
+```bash
+# 在 WSL 中
+git clone https://github.com/ArmyClaw/open-think-reflex.git
+cd open-think-reflex
+go build -o otr ./cmd/otr
+./otr --help
+```
+
+### 配置文件
+
+项目使用 YAML 格式配置文件，默认为 `~/.openclaw/reflex/config.yaml`
+
+复制示例配置快速开始:
+
+```bash
+# Linux/macOS
+cp config.example.yaml ~/.openclaw/reflex/config.yaml
+
+# Windows (PowerShell)
+Copy-Item config.example.yaml $env:USERPROFILE\.openclaw\reflex\config.yaml
+```
+
+配置项说明:
+
+| 配置项 | 说明 | 默认值 |
+|--------|------|--------|
+| `app.data_dir` | 数据存储目录 | `~/.openclaw/reflex` |
+| `app.log_level` | 日志级别 (debug/info/warn/error) | `info` |
+| `ai.provider` | AI 提供商 (anthropic/openai/local) | `anthropic` |
+| `ai.default_model` | 默认模型 | `claude-sonnet-4-20250514` |
+| `storage.type` | 存储类型 | `sqlite` |
+| `storage.path` | 数据库路径 | `~/.openclaw/reflex/data.db` |
+
+环境变量覆盖: 配置项可通过 `OTR_` 前缀的环境变量覆盖，如 `OTR_ANTHROPIC_API_KEY`
 
 ## 开发指南
 

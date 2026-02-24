@@ -1,0 +1,81 @@
+# Open-Think-Reflex 配置示例
+# 复制此文件到 ~/.openclaw/reflex/config.yaml 并根据需要修改
+
+# 配置版本 (勿修改)
+version: 1
+
+# 应用配置
+app:
+  name: open-think-reflex
+  version: dev
+  data_dir: ~/.openclaw/reflex
+  log_level: info
+  profile: false
+
+# 存储配置
+storage:
+  type: sqlite
+  path: ~/.openclaw/reflex/data.db
+  cache_size: 1000
+  max_open_conns: 1
+  max_idle_conns: 1
+  conn_max_lifetime: 3600
+  conn_max_idle_time: 300
+
+# AI 配置
+ai:
+  provider: anthropic
+  default_model: claude-sonnet-4-20250514
+  timeout: 30
+  retry_max: 3
+  providers:
+    anthropic:
+      # API Key 可通过环境变量 OTR_ANTHROPIC_API_KEY 设置
+      api_key: ""
+      api_url: https://api.anthropic.com/v1
+      model: claude-sonnet-4-20250514
+      max_tokens: 4096
+      temperature: 0.7
+    openai:
+      # API Key 可通过环境变量 OTR_OPENAI_API_KEY 设置
+      api_key: ""
+      api_url: https://api.openai.com/v1
+      model: gpt-4
+      max_tokens: 4096
+      temperature: 0.7
+    local:
+      # 本地模型 (Ollama, LM Studio 等)
+      api_url: http://localhost:11434/v1
+      model: llama2
+
+# UI 配置
+ui:
+  theme: dark
+  output_mode: terminal
+  colors:
+    root: "#4A90D9"
+    branch: "#50C878"
+    selected: "#FFD700"
+    unmatched: "#808080"
+    background: "#1E1E1E"
+  keymap:
+    up: k
+    down: j
+    left: h
+    right: l
+    select: " "
+    confirm: enter
+    cancel: esc
+    quit: q
+    help: "?"
+
+# 安全配置
+security:
+  api_keys_env_prefix: OTR_
+  config_file_mode: "0600"
+  audit_log:
+    enabled: true
+    path: ~/.openclaw/reflex/audit.log
+
+# 当前工作空间 (v2.0)
+current_space: ""
