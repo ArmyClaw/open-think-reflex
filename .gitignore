@@ -41,3 +41,6 @@ Thumbs.db
 # Backup
 *.bak
 *~
+
+# OpenClaw (local development)
+.openclaw/
