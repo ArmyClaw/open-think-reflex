@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -8,9 +9,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
+	"unicode/utf8"
 
+	"golang.org/x/term"
+	"github.com/gdamore/tcell/v2"
+	"github.com/mattn/go-runewidth"
 	"github.com/ArmyClaw/open-think-reflex/internal/cli/commands"
 	"github.com/ArmyClaw/open-think-reflex/internal/config"
 	"github.com/ArmyClaw/open-think-reflex/internal/core/matcher"
@@ -71,7 +77,7 @@ Examples:
 
   # Share a pattern
   otr share create --id <pattern-id>`,
-		Commands: buildCommands(storage, cfg, loader),
+	Commands: buildCommands(storage, cfg, loader),
 		Action: func(c *cli.Context) error {
 			fmt.Println("Open-Think-Reflex v" + Version)
 			fmt.Println("\nUse 'otr --help' to see available commands")
@@ -86,12 +92,12 @@ Examples:
 var configLoader *config.Loader
 
 func loadConfig() (*config.Config, *config.Loader, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get home directory: %w", err)
+	homeDir := config.ResolveHomeDir()
+	if homeDir == "" {
+		return nil, nil, fmt.Errorf("failed to resolve home directory")
 	}
 
-	configPath := fmt.Sprintf("%s/.otr", homeDir)
+	configPath := filepath.Join(homeDir, ".otr")
 	loader := config.NewLoader(configPath, "config")
 	configLoader = loader
 	cfg, err := loader.Load()
@@ -121,6 +127,34 @@ func initStorage(cfg *config.Config) (*sqlite.Storage, error) {
 
 func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.Loader) []*cli.Command {
 	return []*cli.Command{
+		{
+			Name:  "thought",
+			Usage: "Manage thought sessions and export",
+			Subcommands: []*cli.Command{
+				{
+					Name:  "export",
+					Usage: "Export thought session",
+					Flags: []cli.Flag{
+						&cli.StringFlag{
+							Name:  "session",
+							Usage: "Session ID (default: latest)",
+						},
+						&cli.StringFlag{
+							Name:  "format",
+							Usage: "Export format: markdown|mermaid|opml",
+							Value: "markdown",
+						},
+						&cli.StringFlag{
+							Name:  "output",
+							Usage: "Output file path",
+						},
+					},
+					Action: func(c *cli.Context) error {
+						return exportThoughts(storage, c.String("session"), c.String("format"), c.String("output"))
+					},
+				},
+			},
+		},
 		{
 			Name:  "interactive",
 			Usage: "Launch interactive TUI mode",
@@ -1507,20 +1541,29 @@ func runQuery(storage *sqlite.Storage, query string, threshold float64) error {
 }
 
 func runInteractive(storage *sqlite.Storage, force bool) error {
-	// If TERM is not set, automatically use script to create pseudo-TTY
-	// This helps in containerized environments (ECS, Docker, CI/CD)
-	if os.Getenv("TERM") == "" {
-		fmt.Println("Starting interactive mode (via script)...")
-		
-		// Use script command to create a pseudo-TTY
-		cmd := exec.Command("script", "-q", "-c", "./otr interactive --force", "/dev/null")
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		cmd.Stdin = os.Stdin
-		cmd.Env = append(os.Environ(), "TERM=xterm-256color")
-		cmd.Dir = "/home/ecs-user/.openclaw/workspace/open-think-reflex"
-		
-		return cmd.Run()
+	// If TERM is not set, try to create a pseudo-TTY on Unix.
+	// On Windows, continue without script (tcell handles the console directly).
+	if os.Getenv("TERM") == "" && runtime.GOOS != "windows" {
+		if scriptPath, err := exec.LookPath("script"); err == nil {
+			fmt.Println("Starting interactive mode (via script)...")
+
+			exePath, err := os.Executable()
+			if err != nil {
+				exePath = "otr"
+			}
+			cmd := exec.Command(scriptPath, "-q", "-c", fmt.Sprintf("%q interactive --force", exePath), "/dev/null")
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			cmd.Stdin = os.Stdin
+			cmd.Env = append(os.Environ(), "TERM=xterm-256color")
+			return cmd.Run()
+		}
+
+		// Fallback if "script" isn't available.
+		_ = os.Setenv("TERM", "xterm-256color")
+	} else if os.Getenv("TERM") == "" && runtime.GOOS == "windows" {
+		// Windows: use ANSI interactive mode by default.
+		return runANSIInteractive(storage)
 	}
 
 	// Check terminal capabilities before starting TUI (skip if force flag is set)
@@ -1531,17 +1574,31 @@ func runInteractive(storage *sqlite.Storage, force bool) error {
 			"or use 'otr interactive --force' to try anyway",
 			os.Getenv("TERM"))
 	}
+	if !force && !isTerminalIO() {
+		return fmt.Errorf("interactive mode requires an interactive terminal. " +
+			"Please run in a real terminal (Windows Terminal, PowerShell, cmd) " +
+			"and avoid piping or redirecting stdin/stdout. " +
+			"Use 'otr interactive --force' to try anyway")
+	}
 
 	fmt.Println("Starting interactive mode...")
 
+	// Windows uses ANSI interactive mode (opencode-like).
+	if runtime.GOOS == "windows" {
+		return runANSIInteractive(storage)
+	}
+
 	app := ui.NewApp(storage)
 	ctx := context.Background()
-
 	return app.Run(ctx)
 }
 
 // isTerminalCapable checks if the current terminal can run TUI apps
 func isTerminalCapable() bool {
+	if runtime.GOOS == "windows" {
+		return true
+	}
+
 	term := os.Getenv("TERM")
 
 	// Only "dumb" or empty TERM is considered not capable
@@ -1551,6 +1608,1161 @@ func isTerminalCapable() bool {
 	}
 
 	return true
+}
+
+func isTerminalIO() bool {
+	return term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
+}
+
+func runANSIInteractive(storage *sqlite.Storage) error {
+	ctx := context.Background()
+	engine := matcher.NewEngine()
+
+	patterns, err := storage.ListPatterns(ctx, contracts.ListOptions{Limit: 1000})
+	if err != nil {
+		return fmt.Errorf("failed to load patterns: %w", err)
+	}
+	spaces, err := storage.ListSpaces(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to load spaces: %w", err)
+	}
+	spaceName := "default"
+	if len(spaces) > 0 && spaces[0].Name != "" {
+		spaceName = spaces[0].Name
+	}
+
+	sessionID, thoughtNodes, err := loadOrCreateThoughtSession(storage)
+	if err != nil {
+		return err
+	}
+	selectedID := ""
+	parentOverride := ""
+	input := ""
+	mode := "input"
+	status := ""
+
+	_ = enableANSI()
+
+	reader := bufio.NewReader(os.Stdin)
+	useRaw := runtime.GOOS != "windows" || os.Getenv("OTR_RAW") == "1"
+	if useRaw && runtime.GOOS != "windows" {
+		oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
+		if err != nil {
+			return fmt.Errorf("failed to enter raw mode: %w", err)
+		}
+		defer func() { _ = term.Restore(int(os.Stdin.Fd()), oldState) }()
+	}
+
+	for {
+		renderANSIUI(spaceName, patterns, thoughtNodes, selectedID, input, mode, status, parentOverride)
+		if runtime.GOOS == "windows" {
+			restore, err := initWindowsConsole()
+			if err != nil {
+				return err
+			}
+			defer restore()
+			for {
+				renderANSIUI(spaceName, patterns, thoughtNodes, selectedID, input, mode, status, parentOverride)
+				key, err := readKeyWindows()
+				if err != nil {
+					return nil
+				}
+				switch key.kind {
+				case keyCtrlC, keyEsc:
+					return nil
+				case keyRune:
+					switch key.r {
+					case 'q':
+						return nil
+					case 'c':
+						if selectedID != "" {
+							if text, ok := getNodeText(thoughtNodes, selectedID); ok {
+								if err := copyToClipboard(text); err != nil {
+									status = fmt.Sprintf("Copy failed: %v", err)
+								} else {
+									status = "Copied to clipboard."
+								}
+							}
+						}
+					case 'p':
+						if selectedID != "" {
+							if parentOverride == selectedID {
+								parentOverride = ""
+								status = "Parent override cleared."
+							} else {
+								parentOverride = selectedID
+								status = "Parent override set to selected node."
+							}
+						}
+					case 'j':
+						if len(thoughtNodes) > 0 {
+							selectedID = moveSelection(thoughtNodes, selectedID, 1)
+							mode = "nav"
+						}
+					case 'k':
+						if len(thoughtNodes) > 0 {
+							selectedID = moveSelection(thoughtNodes, selectedID, -1)
+							mode = "nav"
+						}
+					default:
+						input += string(key.r)
+						mode = "input"
+					}
+				case keyEnter:
+					if strings.TrimSpace(input) == "" {
+						break
+					}
+					thoughtNodes, selectedID, err = addThoughtNode(engine, storage, sessionID, thoughtNodes, input, parentOverride)
+					if err != nil {
+						status = fmt.Sprintf("Failed to save thought: %v", err)
+					}
+					status = ""
+					input = ""
+					mode = "nav"
+				case keyBackspace:
+					if len(input) > 0 {
+						input = string([]rune(input)[:len([]rune(input))-1])
+					}
+					mode = "input"
+				case keyUp:
+					if len(thoughtNodes) > 0 {
+						selectedID = moveSelection(thoughtNodes, selectedID, -1)
+						mode = "nav"
+					}
+				case keyDown:
+					if len(thoughtNodes) > 0 {
+						selectedID = moveSelection(thoughtNodes, selectedID, 1)
+						mode = "nav"
+					}
+				}
+			}
+		}
+
+		if useRaw {
+			key, err := readKey(reader)
+			if err != nil {
+				return nil
+			}
+
+			switch key.kind {
+			case keyCtrlC, keyEsc:
+				return nil
+			case keyRune:
+				switch key.r {
+				case 'q':
+					return nil
+				case 'c':
+					if selectedID != "" {
+						if text, ok := getNodeText(thoughtNodes, selectedID); ok {
+							if err := copyToClipboard(text); err != nil {
+								status = fmt.Sprintf("Copy failed: %v", err)
+							} else {
+								status = "Copied to clipboard."
+							}
+						}
+					}
+				case 'p':
+					if selectedID != "" {
+						if parentOverride == selectedID {
+							parentOverride = ""
+							status = "Parent override cleared."
+						} else {
+							parentOverride = selectedID
+							status = "Parent override set to selected node."
+						}
+					}
+				case 'j':
+					if len(thoughtNodes) > 0 {
+						selectedID = moveSelection(thoughtNodes, selectedID, 1)
+						mode = "nav"
+					}
+				case 'k':
+					if len(thoughtNodes) > 0 {
+						selectedID = moveSelection(thoughtNodes, selectedID, -1)
+						mode = "nav"
+					}
+				case '\r':
+					if input == "" {
+						break
+					}
+					thoughtNodes, selectedID, err = addThoughtNode(engine, storage, sessionID, thoughtNodes, input, parentOverride)
+					if err != nil {
+						status = fmt.Sprintf("Failed to save thought: %v", err)
+					}
+					status = ""
+					input = ""
+					mode = "nav"
+				default:
+					input += string(key.r)
+					mode = "input"
+				}
+			case keyEnter:
+				if strings.TrimSpace(input) == "" {
+					break
+				}
+				thoughtNodes, selectedID, err = addThoughtNode(engine, storage, sessionID, thoughtNodes, input, parentOverride)
+				if err != nil {
+					status = fmt.Sprintf("Failed to save thought: %v", err)
+				}
+				status = ""
+				input = ""
+				mode = "nav"
+			case keyBackspace:
+				if len(input) > 0 {
+					input = string([]rune(input)[:len([]rune(input))-1])
+				}
+				mode = "input"
+			case keyUp:
+				if len(thoughtNodes) > 0 {
+					selectedID = moveSelection(thoughtNodes, selectedID, -1)
+					mode = "nav"
+				}
+			case keyDown:
+				if len(thoughtNodes) > 0 {
+					selectedID = moveSelection(thoughtNodes, selectedID, 1)
+					mode = "nav"
+				}
+			}
+			continue
+		}
+
+	}
+}
+
+type thoughtNode struct {
+	ID       string
+	Text     string
+	ParentID string
+	Children []string
+}
+
+func addThoughtNode(engine *matcher.Engine, storage *sqlite.Storage, sessionID string, nodes []thoughtNode, input string, parentOverride string) ([]thoughtNode, string, error) {
+	parent := parentOverride
+	if len(nodes) > 0 {
+		if parent == "" {
+		patterns := make([]*models.Pattern, 0, len(nodes))
+		for _, n := range nodes {
+			p := models.NewPattern(n.Text, "")
+			p.Strength = 100
+			p.Threshold = 0
+			patterns = append(patterns, p)
+		}
+		opts := contracts.MatchOptions{
+			Threshold:  30,
+			Limit:       1,
+			ExactFirst: true,
+		}
+		results := engine.Match(context.Background(), input, patterns, opts)
+		if len(results) > 0 {
+			for i := range nodes {
+				if nodes[i].Text == results[0].Pattern.Trigger {
+					parent = nodes[i].ID
+					break
+				}
+			}
+		}
+		}
+	}
+
+	newNode := models.NewThoughtNode(sessionID, parent, input)
+	if err := storage.AddThoughtNode(context.Background(), newNode); err != nil {
+		return nodes, "", err
+	}
+
+	node := thoughtNode{ID: newNode.ID, Text: input, ParentID: parent}
+	nodes = append(nodes, node)
+	if parent != "" {
+		for i := range nodes {
+			if nodes[i].ID == parent {
+				nodes[i].Children = append(nodes[i].Children, newNode.ID)
+				break
+			}
+		}
+	}
+	return nodes, newNode.ID, nil
+}
+
+func loadOrCreateThoughtSession(storage *sqlite.Storage) (string, []thoughtNode, error) {
+	ctx := context.Background()
+	session, err := storage.GetLatestThoughtSession(ctx)
+	if err != nil {
+		return "", nil, err
+	}
+	if session == nil {
+		session = models.NewThoughtSession("default")
+		if err := storage.CreateThoughtSession(ctx, session); err != nil {
+			return "", nil, err
+		}
+	}
+
+	dbNodes, err := storage.ListThoughtNodesBySession(ctx, session.ID)
+	if err != nil {
+		return "", nil, err
+	}
+	nodes := make([]thoughtNode, 0, len(dbNodes))
+	for _, n := range dbNodes {
+		nodes = append(nodes, thoughtNode{
+			ID:       n.ID,
+			Text:     n.Text,
+			ParentID: n.ParentID,
+		})
+	}
+	// Build children links.
+	for i := range nodes {
+		parent := nodes[i].ParentID
+		if parent == "" {
+			continue
+		}
+		for j := range nodes {
+			if nodes[j].ID == parent {
+				nodes[j].Children = append(nodes[j].Children, nodes[i].ID)
+				break
+			}
+		}
+	}
+	return session.ID, nodes, nil
+}
+
+func exportThoughts(storage *sqlite.Storage, sessionID, format, outputPath string) error {
+	ctx := context.Background()
+	var session *models.ThoughtSession
+	var err error
+
+	if sessionID == "" {
+		session, err = storage.GetLatestThoughtSession(ctx)
+	} else {
+		// Fetch by ID
+		session = &models.ThoughtSession{ID: sessionID}
+	}
+	if err != nil {
+		return err
+	}
+	if session == nil {
+		return fmt.Errorf("no thought sessions found")
+	}
+
+	nodes, err := storage.ListThoughtNodesBySession(ctx, session.ID)
+	if err != nil {
+		return err
+	}
+	if len(nodes) == 0 {
+		return fmt.Errorf("no thoughts in session")
+	}
+
+	var content string
+	switch strings.ToLower(format) {
+	case "markdown", "md":
+		content = renderThoughtsMarkdown(nodes)
+	case "mermaid":
+		content = renderThoughtsMermaid(nodes)
+	case "opml":
+		content = renderThoughtsOPML(nodes)
+	default:
+		return fmt.Errorf("unsupported format: %s", format)
+	}
+
+	if outputPath == "" {
+		fmt.Println(content)
+		return nil
+	}
+	return os.WriteFile(outputPath, []byte(content), 0644)
+}
+
+func renderThoughtsMarkdown(nodes []*models.ThoughtNode) string {
+	children := map[string][]*models.ThoughtNode{}
+	var roots []*models.ThoughtNode
+	for _, n := range nodes {
+		if n.ParentID == "" {
+			roots = append(roots, n)
+		} else {
+			children[n.ParentID] = append(children[n.ParentID], n)
+		}
+	}
+	var sb strings.Builder
+	sb.WriteString("# Thought Chain\n\n")
+	var walk func(n *models.ThoughtNode, depth int)
+	walk = func(n *models.ThoughtNode, depth int) {
+		sb.WriteString(strings.Repeat("  ", depth))
+		sb.WriteString("- ")
+		sb.WriteString(n.Text)
+		sb.WriteString("\n")
+		for _, c := range children[n.ID] {
+			walk(c, depth+1)
+		}
+	}
+	for _, r := range roots {
+		walk(r, 0)
+	}
+	return sb.String()
+}
+
+func renderThoughtsMermaid(nodes []*models.ThoughtNode) string {
+	children := map[string][]*models.ThoughtNode{}
+	var roots []*models.ThoughtNode
+	for _, n := range nodes {
+		if n.ParentID == "" {
+			roots = append(roots, n)
+		} else {
+			children[n.ParentID] = append(children[n.ParentID], n)
+		}
+	}
+	var sb strings.Builder
+	sb.WriteString("graph LR\n")
+	var walk func(n *models.ThoughtNode)
+	walk = func(n *models.ThoughtNode) {
+		for _, c := range children[n.ID] {
+			sb.WriteString(fmt.Sprintf("  \"%s\" --> \"%s\"\n", escapeMermaid(n.Text), escapeMermaid(c.Text)))
+			walk(c)
+		}
+	}
+	for _, r := range roots {
+		walk(r)
+	}
+	return sb.String()
+}
+
+func escapeMermaid(s string) string {
+	return strings.ReplaceAll(s, "\"", "\\\"")
+}
+
+func renderThoughtsOPML(nodes []*models.ThoughtNode) string {
+	children := map[string][]*models.ThoughtNode{}
+	var roots []*models.ThoughtNode
+	for _, n := range nodes {
+		if n.ParentID == "" {
+			roots = append(roots, n)
+		} else {
+			children[n.ParentID] = append(children[n.ParentID], n)
+		}
+	}
+	var sb strings.Builder
+	sb.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n")
+	sb.WriteString("<opml version=\"2.0\">\n")
+	sb.WriteString("<head>\n  <title>Thought Chain</title>\n</head>\n")
+	sb.WriteString("<body>\n")
+	var walk func(n *models.ThoughtNode, depth int)
+	walk = func(n *models.ThoughtNode, depth int) {
+		indent := strings.Repeat("  ", depth+1)
+		sb.WriteString(fmt.Sprintf("%s<outline text=\"%s\">\n", indent, escapeXML(n.Text)))
+		for _, c := range children[n.ID] {
+			walk(c, depth+1)
+		}
+		sb.WriteString(fmt.Sprintf("%s</outline>\n", indent))
+	}
+	for _, r := range roots {
+		walk(r, 0)
+	}
+	sb.WriteString("</body>\n</opml>\n")
+	return sb.String()
+}
+
+func escapeXML(s string) string {
+	replacer := strings.NewReplacer(
+		"&", "&amp;",
+		"<", "&lt;",
+		">", "&gt;",
+		"\"", "&quot;",
+	)
+	return replacer.Replace(s)
+}
+
+func getNodeText(nodes []thoughtNode, id string) (string, bool) {
+	if id == "" {
+		return "", false
+	}
+	for i := range nodes {
+		if nodes[i].ID == id {
+			return nodes[i].Text, true
+		}
+	}
+	return "", false
+}
+
+func copyToClipboard(text string) error {
+	if text == "" {
+		return nil
+	}
+	switch runtime.GOOS {
+	case "windows":
+		cmd := exec.Command("cmd", "/c", "clip")
+		cmd.Stdin = strings.NewReader(text)
+		return cmd.Run()
+	case "darwin":
+		cmd := exec.Command("pbcopy")
+		cmd.Stdin = strings.NewReader(text)
+		return cmd.Run()
+	default:
+		// Try wl-copy, then xclip as fallback.
+		if err := exec.Command("sh", "-c", "command -v wl-copy >/dev/null 2>&1").Run(); err == nil {
+			cmd := exec.Command("wl-copy")
+			cmd.Stdin = strings.NewReader(text)
+			return cmd.Run()
+		}
+		cmd := exec.Command("xclip", "-selection", "clipboard")
+		cmd.Stdin = strings.NewReader(text)
+		return cmd.Run()
+	}
+}
+
+func renderANSIUI(spaceName string, patterns []*models.Pattern, nodes []thoughtNode, selectedID string, input string, mode string, status string, parentOverride string) {
+	width, height, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil || width <= 0 {
+		width = 80
+	}
+	if height <= 0 {
+		height = 24
+	}
+
+	clearScreen()
+
+	var out []string
+	left := fmt.Sprintf("Open-Think-Reflex  •  Space: %s  •  Patterns: %d", spaceName, len(patterns))
+	right := fmt.Sprintf("Mode: %s", strings.ToUpper(mode))
+	if parentOverride != "" {
+		if text, ok := getNodeText(nodes, parentOverride); ok {
+			right = fmt.Sprintf("%s  •  Parent: %s", right, truncateToWidth(text, 18))
+		} else {
+			right = fmt.Sprintf("%s  •  Parent: *", right)
+		}
+	}
+	header := joinLeftRight(left, right, width)
+	out = append(out, colorHeaderBar(header))
+	// Header only; shortcuts move to status bar for a cleaner top area.
+
+	remaining := height - 7
+	if remaining < 3 {
+		remaining = 3
+	}
+	topContent := max(3, (remaining*4)/6)
+	midContent := max(2, remaining/6)
+	botContent := remaining - topContent - midContent
+	if botContent < 1 {
+		botContent = 1
+	}
+
+	// Thought Chain (Top)
+	out = append(out, colorPanelTitle(padOrTrim("Thought Chain", width)))
+	paths := buildThoughtPaths(nodes)
+	if len(paths) == 0 {
+		out = append(out, colorThoughtBar(padOrTrim("  (no thoughts yet)", width)))
+		for i := 1; i < topContent; i++ {
+			out = append(out, colorThoughtBar(padOrTrim("", width)))
+		}
+	} else {
+		lines := formatThoughtPaths(paths, nodes, selectedID)
+		for i := 0; i < topContent; i++ {
+			line := ""
+			if i < len(lines) {
+				line = lines[i]
+			}
+			out = append(out, colorThoughtBar(padOrTrim(line, width)))
+		}
+	}
+
+	out = append(out, colorSeparator(strings.Repeat("─", width)))
+
+	// Output (Middle)
+	out = append(out, colorPanelTitle(padOrTrim("Output", width)))
+	output := "Type a query and press Enter. Use ↑/↓ or j/k to navigate. p=set parent, c=copy, q=quit."
+	if status != "" {
+		output = status
+	} else if selectedID != "" {
+		if idx := indexOfNode(nodes, selectedID); idx >= 0 {
+			output = nodes[idx].Text
+		}
+	}
+	lines := wrapText(output, width)
+	if len(lines) > midContent {
+		lines = lines[:midContent]
+	}
+	for _, line := range lines {
+		out = append(out, colorOutputBar(padOrTrim(line, width)))
+	}
+	for i := len(lines); i < midContent; i++ {
+		out = append(out, colorOutputBar(padOrTrim("", width)))
+	}
+
+	out = append(out, colorSeparator(strings.Repeat("─", width)))
+
+	// Input (Bottom)
+	out = append(out, colorPanelTitle(padOrTrim("Input", width)))
+	prompt := "> " + input + "|"
+	line := colorInputBar(prompt)
+	remain := width - visibleLen(prompt)
+	if remain > 0 {
+		line += strings.Repeat(" ", remain)
+	}
+	out = append(out, line)
+	for i := 0; i < botContent; i++ {
+		out = append(out, padOrTrim("", width))
+	}
+
+	// Status bar (bottom)
+	selectedText := ""
+	if selectedID != "" {
+		if t, ok := getNodeText(nodes, selectedID); ok {
+			selectedText = truncateToWidth(t, 30)
+		}
+	}
+	leftStatus := fmt.Sprintf("Selected: %s", selectedText)
+	if parentOverride != "" {
+		if t, ok := getNodeText(nodes, parentOverride); ok {
+			leftStatus = fmt.Sprintf("%s | Parent: %s", leftStatus, truncateToWidth(t, 20))
+		}
+	}
+	rightStatus := "j/k or ↑/↓ move • Enter add • p parent • c copy • q quit"
+	statusLine := joinLeftRight(leftStatus, rightStatus, width)
+	out = append(out, colorStatusBar(padOrTrim(truncateToWidth(statusLine, width), width)))
+
+	if len(out) > height {
+		out = out[:height]
+	}
+	for len(out) < height {
+		out = append(out, padOrTrim("", width))
+	}
+	for _, line := range out {
+		fmt.Println(line)
+	}
+}
+
+func clearScreen() {
+	if runtime.GOOS == "windows" {
+		clearScreenWindows()
+		return
+	}
+	fmt.Print("\x1b[2J\x1b[H")
+}
+
+func wrapText(text string, width int) []string {
+	if width <= 0 {
+		return []string{text}
+	}
+	words := strings.Fields(strings.ReplaceAll(text, "\n", " "))
+	if len(words) == 0 {
+		return []string{""}
+	}
+	lines := []string{}
+	current := ""
+	for _, w := range words {
+		if len(current)+len(w)+1 > width {
+			lines = append(lines, strings.TrimSpace(current))
+			current = w + " "
+		} else {
+			current += w + " "
+		}
+	}
+	if strings.TrimSpace(current) != "" {
+		lines = append(lines, strings.TrimSpace(current))
+	}
+	return lines
+}
+
+func buildThoughtPaths(nodes []thoughtNode) [][]int {
+	children := make(map[string][]string, len(nodes))
+	roots := make([]string, 0)
+	for _, n := range nodes {
+		if n.ParentID == "" {
+			roots = append(roots, n.ID)
+			continue
+		}
+		children[n.ParentID] = append(children[n.ParentID], n.ID)
+	}
+
+	var paths [][]int
+	var walk func(id string, path []int)
+	walk = func(id string, path []int) {
+		idx := indexOfNode(nodes, id)
+		if idx < 0 {
+			return
+		}
+		path = append(path, idx)
+		if len(children[id]) == 0 {
+			cp := make([]int, len(path))
+			copy(cp, path)
+			paths = append(paths, cp)
+			return
+		}
+		for _, child := range children[id] {
+			walk(child, path)
+		}
+	}
+
+	for _, root := range roots {
+		walk(root, nil)
+	}
+	return paths
+}
+
+func buildThoughtFlat(nodes []thoughtNode) []int {
+	paths := buildThoughtPaths(nodes)
+	var flat []int
+	seen := make(map[int]bool, len(nodes))
+	for _, p := range paths {
+		for _, idx := range p {
+			if !seen[idx] {
+				seen[idx] = true
+				flat = append(flat, idx)
+			}
+		}
+	}
+	return flat
+}
+
+func moveSelection(nodes []thoughtNode, currentID string, delta int) string {
+	flat := buildThoughtFlat(nodes)
+	if len(flat) == 0 {
+		return ""
+	}
+	idx := 0
+	for i := range flat {
+		if nodes[flat[i]].ID == currentID {
+			idx = i
+			break
+		}
+	}
+	idx = max(0, min(idx+delta, len(flat)-1))
+	return nodes[flat[idx]].ID
+}
+
+func formatThoughtPaths(paths [][]int, nodes []thoughtNode, selectedID string) []string {
+	if len(paths) == 0 {
+		return nil
+	}
+
+	// Compute max width per depth for alignment (text only).
+	maxDepth := 0
+	for _, p := range paths {
+		if len(p) > maxDepth {
+			maxDepth = len(p)
+		}
+	}
+	colWidths := make([]int, maxDepth)
+	for _, p := range paths {
+		for i, idx := range p {
+			w := runewidth.StringWidth(nodes[idx].Text)
+			if w > colWidths[i] {
+				colWidths[i] = w
+			}
+		}
+	}
+
+	// Merge paths with aligned columns.
+	lines := make([]string, 0, len(paths))
+	var prev []int
+	for _, p := range paths {
+		common := 0
+		for common < len(prev) && common < len(p) && prev[common] == p[common] {
+			common++
+		}
+		var parts []string
+		for i := 0; i < len(p); i++ {
+			if i < common {
+				if i == 0 {
+					parts = append(parts, strings.Repeat(" ", colWidths[i]))
+				} else {
+					parts = append(parts, "│ "+strings.Repeat(" ", colWidths[i]))
+				}
+				continue
+			}
+			idx := p[i]
+			id := nodes[idx].ID
+			text := nodes[idx].Text
+			if id == selectedID {
+				text = colorSelectBar(text)
+			} else {
+				text = colorDim(text)
+			}
+			if i == 0 {
+				parts = append(parts, padToWidth(text, colWidths[i]))
+			} else if i == 1 {
+				conn := "├─ "
+				if isLastChild(nodes, id) {
+					conn = "└─ "
+				}
+				if isFirstChild(nodes, id) && !hasSibling(nodes, id) {
+					conn = "── "
+				}
+				parts = append(parts, padToWidth(conn+text, colWidths[i]+2))
+			} else {
+				conn := "├─ "
+				if isLastChild(nodes, id) {
+					conn = "└─ "
+				}
+				parts = append(parts, padToWidth(conn+text, colWidths[i]+2))
+			}
+		}
+		line := strings.Join(parts, "  ")
+		lines = append(lines, line)
+		prev = p
+	}
+	return lines
+}
+
+func padToWidth(s string, width int) string {
+	if visibleLen(s) >= width {
+		return s
+	}
+	return s + strings.Repeat(" ", width-visibleLen(s))
+}
+
+func joinLeftRight(left, right string, width int) string {
+	l := truncateToWidth(left, width)
+	r := truncateToWidth(right, width)
+	lw := visibleLen(l)
+	rw := visibleLen(r)
+	if lw+rw+1 >= width {
+		// Not enough space, fall back to left only.
+		return padOrTrim(l, width)
+	}
+	gap := width - lw - rw
+	return l + strings.Repeat(" ", gap) + r
+}
+
+func isLastChild(nodes []thoughtNode, id string) bool {
+	if id == "" {
+		return false
+	}
+	parent := ""
+	for i := range nodes {
+		if nodes[i].ID == id {
+			parent = nodes[i].ParentID
+			break
+		}
+	}
+	if parent == "" {
+		return true
+	}
+	var children []string
+	for i := range nodes {
+		if nodes[i].ID == parent {
+			children = nodes[i].Children
+			break
+		}
+	}
+	if len(children) == 0 {
+		return true
+	}
+	return children[len(children)-1] == id
+}
+
+func isFirstChild(nodes []thoughtNode, id string) bool {
+	if id == "" {
+		return false
+	}
+	parent := ""
+	for i := range nodes {
+		if nodes[i].ID == id {
+			parent = nodes[i].ParentID
+			break
+		}
+	}
+	if parent == "" {
+		return false
+	}
+	var children []string
+	for i := range nodes {
+		if nodes[i].ID == parent {
+			children = nodes[i].Children
+			break
+		}
+	}
+	if len(children) == 0 {
+		return false
+	}
+	return children[0] == id
+}
+
+func hasSibling(nodes []thoughtNode, id string) bool {
+	if id == "" {
+		return false
+	}
+	parent := ""
+	for i := range nodes {
+		if nodes[i].ID == id {
+			parent = nodes[i].ParentID
+			break
+		}
+	}
+	if parent == "" {
+		return false
+	}
+	for i := range nodes {
+		if nodes[i].ID == parent {
+			return len(nodes[i].Children) > 1
+		}
+	}
+	return false
+}
+
+func indexOfNode(nodes []thoughtNode, id string) int {
+	for i := range nodes {
+		if nodes[i].ID == id {
+			return i
+		}
+	}
+	return -1
+}
+
+func padOrTrim(s string, width int) string {
+	if visibleLen(s) >= width {
+		return truncateToWidth(s, width)
+	}
+	return s + strings.Repeat(" ", width-visibleLen(s))
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+type keyKind int
+
+const (
+	keyRune keyKind = iota
+	keyEnter
+	keyBackspace
+	keyUp
+	keyDown
+	keyEsc
+	keyCtrlC
+)
+
+type keyEvent struct {
+	kind keyKind
+	r    rune
+}
+
+func readKey(reader *bufio.Reader) (keyEvent, error) {
+	var buf [3]byte
+	n, err := reader.Read(buf[:1])
+	if err != nil || n == 0 {
+		return keyEvent{}, err
+	}
+	b := buf[0]
+	switch b {
+	case 3:
+		return keyEvent{kind: keyCtrlC}, nil
+	case 13:
+		return keyEvent{kind: keyEnter}, nil
+	case 127, 8:
+		return keyEvent{kind: keyBackspace}, nil
+	case 27:
+		// ESC or arrow sequence
+		_, _ = reader.Read(buf[:1])
+		if buf[0] == '[' {
+			_, _ = reader.Read(buf[:1])
+			switch buf[0] {
+			case 'A':
+				return keyEvent{kind: keyUp}, nil
+			case 'B':
+				return keyEvent{kind: keyDown}, nil
+			}
+		}
+		return keyEvent{kind: keyEsc}, nil
+	default:
+		if b < 0x80 {
+			return keyEvent{kind: keyRune, r: rune(b)}, nil
+		}
+		// UTF-8 rune
+		extra := utf8.UTFMax
+		buf := []byte{b}
+		for len(buf) < extra {
+			nb, e := reader.ReadByte()
+			if e != nil {
+				break
+			}
+			buf = append(buf, nb)
+			if utf8.FullRune(buf) {
+				break
+			}
+		}
+		r, _ := utf8.DecodeRune(buf)
+		if r == utf8.RuneError {
+			return keyEvent{kind: keyRune, r: rune(b)}, nil
+		}
+		return keyEvent{kind: keyRune, r: r}, nil
+	}
+}
+
+func enableANSI() error {
+	// Best effort: Windows Terminal supports ANSI by default.
+	return nil
+}
+
+func colorTitle(s string) string {
+	// Opencode-like: bright cyan
+	return "\x1b[1;96m" + s + "\x1b[0m"
+}
+
+func colorSection(s string) string {
+	// Soft gold for section headers
+	return "\x1b[1;38;5;220m" + s + "\x1b[0m"
+}
+
+func colorDim(s string) string {
+	return "\x1b[2;37m" + s + "\x1b[0m"
+}
+
+func colorSelect(s string) string {
+	// Reverse + bold
+	return "\x1b[1;7m" + s + "\x1b[0m"
+}
+
+func colorSelectBar(s string) string {
+	// Dark highlight bar with bright text
+	return "\x1b[48;5;239m\x1b[1;97m" + s + "\x1b[0m"
+}
+
+func colorInput(s string) string {
+	return "\x1b[1;92m" + s + "\x1b[0m"
+}
+
+func colorInputBar(s string) string {
+	return "\x1b[48;5;234m\x1b[1;92m" + s + "\x1b[0m"
+}
+
+func colorOutputBar(s string) string {
+	return "\x1b[48;5;233m\x1b[37m" + s + "\x1b[0m"
+}
+
+func colorThoughtBar(s string) string {
+	return "\x1b[48;5;232m\x1b[37m" + s + "\x1b[0m"
+}
+
+func colorHeaderBar(s string) string {
+	return "\x1b[48;5;235m\x1b[1;97m" + s + "\x1b[0m"
+}
+
+func colorStatusBar(s string) string {
+	return "\x1b[48;5;235m\x1b[37m" + s + "\x1b[0m"
+}
+
+func colorPanelTitle(s string) string {
+	return "\x1b[48;5;234m\x1b[1;38;5;223m" + s + "\x1b[0m"
+}
+
+func colorSeparator(s string) string {
+	return "\x1b[38;5;237m" + s + "\x1b[0m"
+}
+
+func visibleLen(s string) int {
+	return runewidth.StringWidth(stripANSI(s))
+}
+
+func stripANSI(s string) string {
+	var out strings.Builder
+	inEsc := false
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		if inEsc {
+			if ch == 'm' {
+				inEsc = false
+			}
+			continue
+		}
+		if ch == 0x1b {
+			inEsc = true
+			continue
+		}
+		out.WriteByte(ch)
+	}
+	return out.String()
+}
+
+func truncateToWidth(s string, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	var out strings.Builder
+	inEsc := false
+	current := 0
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		if inEsc {
+			out.WriteByte(ch)
+			if ch == 'm' {
+				inEsc = false
+			}
+			continue
+		}
+		if ch == 0x1b {
+			inEsc = true
+			out.WriteByte(ch)
+			continue
+		}
+		r, size := utf8.DecodeRuneInString(s[i:])
+		if r == utf8.RuneError && size == 1 {
+			if current+1 > width {
+				break
+			}
+			out.WriteByte(ch)
+			current++
+			continue
+		}
+		rw := runewidth.RuneWidth(r)
+		if current+rw > width {
+			break
+		}
+		out.WriteString(s[i : i+size])
+		current += rw
+		i += size - 1
+	}
+	return out.String()
+}
+
+// initWindowsScreen picks the most compatible screen based on environment.
+func initWindowsScreen() (tcell.Screen, bool, error) {
+	if v := strings.ToLower(os.Getenv("OTR_TCELL_SCREEN")); v != "" {
+		switch v {
+		case "console":
+			if os.Getenv("TCELL_VTMODE") == "" {
+				_ = os.Setenv("TCELL_VTMODE", "disable")
+			}
+			screen, err := tcell.NewConsoleScreen()
+			if err != nil {
+				return nil, false, fmt.Errorf("failed to init Windows console screen: %w", err)
+			}
+			return screen, false, nil
+		case "terminfo", "vt":
+			if os.Getenv("TCELL_VTMODE") == "" {
+				_ = os.Setenv("TCELL_VTMODE", "enable")
+			}
+			screen, err := tcell.NewTerminfoScreen()
+			if err != nil {
+				return nil, true, fmt.Errorf("failed to init Windows VT screen: %w", err)
+			}
+			return screen, true, nil
+		}
+	}
+
+	// Prefer VT/terminfo when running in Windows Terminal or ConPTY-like environments.
+	if os.Getenv("WT_SESSION") != "" || os.Getenv("TERM") != "" || os.Getenv("TERM_PROGRAM") != "" {
+		if os.Getenv("TCELL_VTMODE") == "" {
+			_ = os.Setenv("TCELL_VTMODE", "enable")
+		}
+		if screen, err := tcell.NewTerminfoScreen(); err == nil {
+			return screen, true, nil
+		}
+	}
+
+	// Fallback to native console screen.
+	if os.Getenv("TCELL_VTMODE") == "" {
+		_ = os.Setenv("TCELL_VTMODE", "disable")
+	}
+	screen, err := tcell.NewConsoleScreen()
+	if err != nil {
+		return nil, false, fmt.Errorf("failed to init Windows console screen: %w", err)
+	}
+	return screen, false, nil
 }
 
 func truncate(s string, maxLen int) string {

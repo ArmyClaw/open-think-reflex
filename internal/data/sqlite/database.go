@@ -161,6 +161,23 @@ func (d *Database) Migrate(ctx context.Context) error {
 			user_id TEXT
 		)`,
 
+		// Thought sessions
+		`CREATE TABLE IF NOT EXISTS thought_sessions (
+			id TEXT PRIMARY KEY,
+			title TEXT,
+			created_at INTEGER NOT NULL,
+			updated_at INTEGER NOT NULL
+		)`,
+
+		// Thought nodes
+		`CREATE TABLE IF NOT EXISTS thought_nodes (
+			id TEXT PRIMARY KEY,
+			session_id TEXT NOT NULL,
+			parent_id TEXT,
+			text TEXT NOT NULL,
+			created_at INTEGER NOT NULL
+		)`,
+
 		// Notes table (Phase 10: 思绪整理)
 		`CREATE TABLE IF NOT EXISTS notes (
 			id TEXT PRIMARY KEY,

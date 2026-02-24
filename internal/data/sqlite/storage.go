@@ -202,6 +202,89 @@ func (s *Storage) ListPatterns(ctx context.Context, opts contracts.ListOptions) 
 	return patterns, rows.Err()
 }
 
+// CreateThoughtSession creates a new thought session.
+func (s *Storage) CreateThoughtSession(ctx context.Context, session *models.ThoughtSession) error {
+	_, err := s.db.db.ExecContext(ctx, `
+		INSERT INTO thought_sessions (id, title, created_at, updated_at)
+		VALUES (?, ?, ?, ?)
+	`, session.ID, session.Title, session.CreatedAt.Unix(), session.UpdatedAt.Unix())
+	return err
+}
+
+// GetLatestThoughtSession returns the most recent session or nil if none.
+func (s *Storage) GetLatestThoughtSession(ctx context.Context) (*models.ThoughtSession, error) {
+	var sess models.ThoughtSession
+	var createdAt, updatedAt sql.NullInt64
+
+	err := s.db.db.QueryRowContext(ctx, `
+		SELECT id, title, created_at, updated_at
+		FROM thought_sessions
+		ORDER BY updated_at DESC
+		LIMIT 1
+	`).Scan(&sess.ID, &sess.Title, &createdAt, &updatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	sess.CreatedAt = int64ToTime(createdAt)
+	sess.UpdatedAt = int64ToTime(updatedAt)
+	return &sess, nil
+}
+
+// AddThoughtNode inserts a thought node.
+func (s *Storage) AddThoughtNode(ctx context.Context, node *models.ThoughtNode) error {
+	_, err := s.db.db.ExecContext(ctx, `
+		INSERT INTO thought_nodes (id, session_id, parent_id, text, created_at)
+		VALUES (?, ?, ?, ?, ?)
+	`, node.ID, node.SessionID, nullIfEmpty(node.ParentID), node.Text, node.CreatedAt.Unix())
+	if err != nil {
+		return err
+	}
+	_, _ = s.db.db.ExecContext(ctx, `
+		UPDATE thought_sessions SET updated_at = ? WHERE id = ?
+	`, time.Now().Unix(), node.SessionID)
+	return nil
+}
+
+// ListThoughtNodesBySession lists all nodes for a session.
+func (s *Storage) ListThoughtNodesBySession(ctx context.Context, sessionID string) ([]*models.ThoughtNode, error) {
+	rows, err := s.db.db.QueryContext(ctx, `
+		SELECT id, session_id, parent_id, text, created_at
+		FROM thought_nodes
+		WHERE session_id = ?
+		ORDER BY created_at ASC
+	`, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var nodes []*models.ThoughtNode
+	for rows.Next() {
+		var n models.ThoughtNode
+		var parentID sql.NullString
+		var createdAt sql.NullInt64
+		if err := rows.Scan(&n.ID, &n.SessionID, &parentID, &n.Text, &createdAt); err != nil {
+			return nil, err
+		}
+		if parentID.Valid {
+			n.ParentID = parentID.String
+		}
+		n.CreatedAt = int64ToTime(createdAt)
+		nodes = append(nodes, &n)
+	}
+	return nodes, rows.Err()
+}
+
+func nullIfEmpty(s string) interface{} {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
 // DeletePattern soft deletes a pattern
 func (s *Storage) DeletePattern(ctx context.Context, id string) error {
 	now := time.Now()

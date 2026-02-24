@@ -5,6 +5,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -284,10 +285,8 @@ func (l *Loader) applyEnvOverrides() {
 
 // resolvePaths resolves relative paths to absolute paths
 func (l *Loader) resolvePaths(cfg *Config) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		// If we can't determine home directory, use a safe default
-		// Don't replace $HOME with empty string - that would create relative paths
+	home := ResolveHomeDir()
+	if home == "" {
 		return
 	}
 
@@ -295,16 +294,56 @@ func (l *Loader) resolvePaths(cfg *Config) {
 	if strings.HasPrefix(cfg.App.DataDir, "$HOME") {
 		cfg.App.DataDir = strings.Replace(cfg.App.DataDir, "$HOME", home, 1)
 	}
+	if strings.HasPrefix(cfg.App.DataDir, "~") {
+		cfg.App.DataDir = filepath.Join(home, trimHomePrefix(cfg.App.DataDir))
+	}
 
 	// Resolve storage path
 	if strings.HasPrefix(cfg.Storage.Path, "$HOME") {
 		cfg.Storage.Path = strings.Replace(cfg.Storage.Path, "$HOME", home, 1)
+	}
+	if strings.HasPrefix(cfg.Storage.Path, "~") {
+		cfg.Storage.Path = filepath.Join(home, trimHomePrefix(cfg.Storage.Path))
 	}
 
 	// Resolve audit log path
 	if strings.HasPrefix(cfg.Security.AuditLog.Path, "$HOME") {
 		cfg.Security.AuditLog.Path = strings.Replace(cfg.Security.AuditLog.Path, "$HOME", home, 1)
 	}
+	if strings.HasPrefix(cfg.Security.AuditLog.Path, "~") {
+		cfg.Security.AuditLog.Path = filepath.Join(home, trimHomePrefix(cfg.Security.AuditLog.Path))
+	}
+}
+
+// ResolveHomeDir returns a usable home directory path with Windows-friendly fallbacks.
+func ResolveHomeDir() string {
+	if home, err := os.UserHomeDir(); err == nil && isUsableHome(home) {
+		return home
+	}
+	if home := os.Getenv("USERPROFILE"); isUsableHome(home) {
+		return home
+	}
+	drive := os.Getenv("HOMEDRIVE")
+	path := os.Getenv("HOMEPATH")
+	if drive != "" && path != "" {
+		home := drive + path
+		if isUsableHome(home) {
+			return home
+		}
+	}
+	return ""
+}
+
+func isUsableHome(home string) bool {
+	if home == "" || home == "~" || home == "." {
+		return false
+	}
+	return filepath.IsAbs(home)
+}
+
+func trimHomePrefix(p string) string {
+	rest := strings.TrimPrefix(p, "~")
+	return strings.TrimLeft(rest, `/\`)
 }
 
 // Save saves the configuration to file

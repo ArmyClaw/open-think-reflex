@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/ArmyClaw/open-think-reflex/internal/core/matcher"
@@ -21,6 +22,7 @@ type App struct {
 	pages       *tview.Pages
 	theme       *Theme
 	themeManager *ThemeManager
+	mouseEnabled bool
 	
 	// Layers
 	thoughtChain *ThoughtChainView
@@ -35,6 +37,9 @@ type App struct {
 	patternForm   *PatternFormPanel
 	settingsPanel *SettingsPanel
 	historyPanel  *HistoryPanel
+	headerInfo   *tview.TextView
+	onFirstDraw  func()
+	firstDrawOnce sync.Once
 	
 	// State
 	currentSpace *models.Space
@@ -67,6 +72,7 @@ func NewApp(storage *sqlite.Storage) *App {
 		theme:        themeManager.Current(),
 		themeManager: themeManager,
 		mode:         ModeInput,
+		mouseEnabled: true,
 	}
 	
 	a.app = tview.NewApplication()
@@ -77,22 +83,65 @@ func NewApp(storage *sqlite.Storage) *App {
 
 // Run starts the TUI application
 func (a *App) Run(ctx context.Context) error {
-	// Load initial data
-	if err := a.loadData(ctx); err != nil {
-		return fmt.Errorf("failed to load data: %w", err)
-	}
-	
 	// Set up the application
 	a.app.SetRoot(a.pages, true)
 	a.app.SetFocus(a.input.view)
 	
 	// Enable mouse support
-	a.app.EnableMouse(true)
+	a.app.EnableMouse(a.mouseEnabled)
 	
 	// Set up keyboard shortcuts
 	a.setupKeyBindings()
-	
+
+	// Show a lightweight loading message before data is ready.
+	a.output.SetOutput("Loading data...")
+	a.statusBar.SetStatus(StatusProcessing, "Loading")
+
+	ready := make(chan struct{})
+	a.app.SetAfterDrawFunc(func(screen tcell.Screen) {
+		a.firstDrawOnce.Do(func() {
+			close(ready)
+			if a.onFirstDraw != nil {
+				a.onFirstDraw()
+			}
+		})
+		a.app.SetAfterDrawFunc(nil)
+	})
+
+	go func() {
+		patterns, space, err := a.fetchData(ctx)
+		<-ready
+		a.app.QueueUpdateDraw(func() {
+			if err != nil {
+				a.output.SetStatus(fmt.Sprintf("Error loading data: %v", err), false)
+				a.statusBar.SetStatus(StatusError, "Load failed")
+				return
+			}
+			a.patterns = patterns
+			a.currentSpace = space
+			a.statusBar.SetPatternCount(len(a.patterns))
+			a.statusBar.SetStatus(StatusIdle, "Ready")
+			a.updateHeader()
+		})
+	}()
+
 	return a.app.Run()
+}
+
+// SetScreen allows callers to provide a pre-configured tcell screen.
+func (a *App) SetScreen(screen tcell.Screen) {
+	a.app.SetScreen(screen)
+}
+
+// SetMouseEnabled enables or disables mouse support.
+func (a *App) SetMouseEnabled(enabled bool) {
+	a.mouseEnabled = enabled
+	a.app.EnableMouse(enabled)
+}
+
+// OnFirstDraw registers a callback invoked after the first successful draw.
+func (a *App) OnFirstDraw(fn func()) {
+	a.onFirstDraw = fn
 }
 
 // Stop stops the TUI application
@@ -101,23 +150,33 @@ func (a *App) Stop() {
 }
 
 func (a *App) loadData(ctx context.Context) error {
-	// Load patterns
-	patterns, err := a.storage.ListPatterns(ctx, contracts.ListOptions{Limit: 1000})
+	patterns, space, err := a.fetchData(ctx)
 	if err != nil {
 		return err
 	}
 	a.patterns = patterns
-	
-	// Load default space
-	spaces, err := a.storage.ListSpaces(ctx)
-	if err != nil {
-		return err
-	}
-	if len(spaces) > 0 {
-		a.currentSpace = spaces[0]
-	}
+	a.currentSpace = space
 	
 	return nil
+}
+
+func (a *App) fetchData(ctx context.Context) ([]*models.Pattern, *models.Space, error) {
+	patterns, err := a.storage.ListPatterns(ctx, contracts.ListOptions{Limit: 1000})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	spaces, err := a.storage.ListSpaces(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var space *models.Space
+	if len(spaces) > 0 {
+		space = spaces[0]
+	}
+
+	return patterns, space, nil
 }
 
 func (a *App) setupPages() {
@@ -193,6 +252,7 @@ func (a *App) createHeader() tview.Primitive {
 		SetText(fmt.Sprintf("Space: %s | Patterns: %d | Mode: %s | [↑/↓] Navigate | [Tab] Switch Panel", spaceName, patternCount, modeText)).
 		SetTextColor(a.theme.Secondary).
 		SetTextAlign(tview.AlignCenter)
+	a.headerInfo = info
 	
 	header := tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(title, 1, 0, false).
@@ -253,6 +313,7 @@ func (a *App) setupKeyBindings() {
 				a.app.SetFocus(a.input.view)
 				a.shortcutBar.SetMode(ModeInput)
 			}
+			a.updateHeader()
 			return nil
 		}
 		
@@ -285,6 +346,7 @@ func (a *App) setupKeyBindings() {
 				a.mode = ModeInput
 				a.thoughtChain.SetFocused(false)
 				a.app.SetFocus(a.input.view)
+				a.updateHeader()
 				return nil
 			}
 		}
@@ -299,6 +361,7 @@ func (a *App) setupKeyBindings() {
 				a.mode = ModeInput
 				a.thoughtChain.SetFocused(false)
 				a.app.SetFocus(a.input.view)
+				a.updateHeader()
 				return nil
 			}
 			a.Stop()
@@ -390,6 +453,25 @@ func (a *App) setupKeyBindings() {
 		}
 		return event
 	})
+}
+
+func (a *App) updateHeader() {
+	if a.headerInfo == nil {
+		return
+	}
+
+	patternCount := len(a.patterns)
+	spaceName := "default"
+	if a.currentSpace != nil && a.currentSpace.Name != "" {
+		spaceName = a.currentSpace.Name
+	}
+
+	modeText := "INPUT"
+	if a.mode == ModeNavigation {
+		modeText = "NAVIGATE"
+	}
+
+	a.headerInfo.SetText(fmt.Sprintf("Space: %s | Patterns: %d | Mode: %s | [↑/↓] Navigate | [Tab] Switch Panel", spaceName, patternCount, modeText))
 }
 
 // updateOutputForSelection updates the output panel based on current selection
