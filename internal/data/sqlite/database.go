@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/ArmyClaw/open-think-reflex/pkg/models"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // Database represents a SQLite database connection
@@ -50,7 +50,7 @@ func NewDatabaseWithConfig(path string, config DatabaseConfig) (*Database, error
 	}
 
 	// Open database connection
-	db, err := sql.Open("sqlite3", path)
+	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
