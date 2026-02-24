@@ -207,6 +207,23 @@ Copy-Item config.example.yaml $env:USERPROFILE\.otr\config.yaml
 
 环境变量覆盖: 配置项可通过 `OTR_` 前缀的环境变量覆盖，如 `OTR_ANTHROPIC_API_KEY`
 
+### API Key 配置 (可选)
+
+**API Key 是可选配置**。不配置 API Key 时，AI 生成功能不可用，但其他功能可正常使用：
+
+| 功能 | 无 API Key | 有 API Key |
+|------|-----------|------------|
+| 反射匹配 | ✅ 正常 | ✅ 正常 |
+| Pattern 管理 | ✅ 正常 | ✅ 正常 |
+| SQLite 存储 | ✅ 正常 | ✅ 正常 |
+| AI 代码生成 | ❌ 不可用 | ✅ 正常 |
+| 思维链展开 | ❌ 不可用 | ✅ 正常 |
+
+获取 API Key:
+- **Anthropic (Claude)**: https://console.anthropic.com/
+- **OpenAI**: https://platform.openai.com/api-keys
+- **本地模型**: 使用 Ollama、LM Studio 等本地部署
+
 ## 开发指南
 
 ### 迭代开发

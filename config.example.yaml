@@ -1,5 +1,7 @@
 # Open-Think-Reflex 配置示例
 # 复制此文件到 ~/.otr/config.yaml 并根据需要修改
+#
+# 注意: API Key 可选配置。无 API Key 时，AI 生成功能不可用，但其他功能正常使用。
 
 # 配置版本 (勿修改)
 version: 1
