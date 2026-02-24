@@ -1,5 +1,5 @@
 # Open-Think-Reflex 配置示例
-# 复制此文件到 ~/.openclaw/reflex/config.yaml 并根据需要修改
+# 复制此文件到 ~/.otr/config.yaml 并根据需要修改
 
 # 配置版本 (勿修改)
 version: 1
@@ -8,14 +8,14 @@ version: 1
 app:
   name: open-think-reflex
   version: dev
-  data_dir: ~/.openclaw/reflex
+  data_dir: ~/.otr
   log_level: info
   profile: false
 
 # 存储配置
 storage:
   type: sqlite
-  path: ~/.openclaw/reflex/data.db
+  path: ~/.otr/data.db
   cache_size: 1000
   max_open_conns: 1
   max_idle_conns: 1
@@ -75,7 +75,7 @@ security:
   config_file_mode: "0600"
   audit_log:
     enabled: true
-    path: ~/.openclaw/reflex/audit.log
+    path: ~/.otr/audit.log
 
 # 当前工作空间 (v2.0)
 current_space: ""

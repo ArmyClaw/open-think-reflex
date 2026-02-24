@@ -180,28 +180,30 @@ go build -o otr ./cmd/otr
 
 ### 配置文件
 
-项目使用 YAML 格式配置文件，默认为 `~/.openclaw/reflex/config.yaml`
+项目使用 YAML 格式配置文件，默认为 `~/.otr/config.yaml`
 
 复制示例配置快速开始:
 
 ```bash
 # Linux/macOS
-cp config.example.yaml ~/.openclaw/reflex/config.yaml
+mkdir -p ~/.otr
+cp config.example.yaml ~/.otr/config.yaml
 
 # Windows (PowerShell)
-Copy-Item config.example.yaml $env:USERPROFILE\.openclaw\reflex\config.yaml
+New-Item -ItemType Directory -Path $env:USERPROFILE\.otr -Force
+Copy-Item config.example.yaml $env:USERPROFILE\.otr\config.yaml
 ```
 
 配置项说明:
 
 | 配置项 | 说明 | 默认值 |
 |--------|------|--------|
-| `app.data_dir` | 数据存储目录 | `~/.openclaw/reflex` |
+| `app.data_dir` | 数据存储目录 | `~/.otr` |
 | `app.log_level` | 日志级别 (debug/info/warn/error) | `info` |
 | `ai.provider` | AI 提供商 (anthropic/openai/local) | `anthropic` |
 | `ai.default_model` | 默认模型 | `claude-sonnet-4-20250514` |
 | `storage.type` | 存储类型 | `sqlite` |
-| `storage.path` | 数据库路径 | `~/.openclaw/reflex/data.db` |
+| `storage.path` | 数据库路径 | `~/.otr/data.db` |
 
 环境变量覆盖: 配置项可通过 `OTR_` 前缀的环境变量覆盖，如 `OTR_ANTHROPIC_API_KEY`
 
