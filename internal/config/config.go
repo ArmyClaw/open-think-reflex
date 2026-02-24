@@ -284,7 +284,12 @@ func (l *Loader) applyEnvOverrides() {
 
 // resolvePaths resolves relative paths to absolute paths
 func (l *Loader) resolvePaths(cfg *Config) {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		// If we can't determine home directory, use a safe default
+		// Don't replace $HOME with empty string - that would create relative paths
+		return
+	}
 
 	// Resolve data_dir
 	if strings.HasPrefix(cfg.App.DataDir, "$HOME") {
