@@ -11,7 +11,7 @@ import (
 )
 
 // Skill represents an AgentSkill exported from OTR.
-// This follows the OpenClaw AgentSkill format.
+// This follows the AgentSkill JSON format (used by OpenClaw).
 type Skill struct {
 	// Metadata
 	Name        string            `json:"name"`         // Skill name (from trigger)

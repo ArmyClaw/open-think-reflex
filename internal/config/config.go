@@ -213,13 +213,13 @@ func (l *Loader) setDefaults() {
 	// App defaults
 	l.v.SetDefault("app.name", "open-think-reflex")
 	l.v.SetDefault("app.version", "dev")
-	l.v.SetDefault("app.data_dir", "$HOME/.openclaw/reflex")
+	l.v.SetDefault("app.data_dir", "$HOME/.otr")
 	l.v.SetDefault("app.log_level", "info")
 	l.v.SetDefault("app.profile", false)
 
 	// Storage defaults
 	l.v.SetDefault("storage.type", "sqlite")
-	l.v.SetDefault("storage.path", "$HOME/.openclaw/reflex/data.db")
+	l.v.SetDefault("storage.path", "$HOME/.otr/data.db")
 	l.v.SetDefault("storage.cache_size", 1000)
 	l.v.SetDefault("storage.max_open_conns", 1)   // SQLite single-writer model
 	l.v.SetDefault("storage.max_idle_conns", 1)
@@ -264,7 +264,7 @@ func (l *Loader) setDefaults() {
 	l.v.SetDefault("security.api_keys_env_prefix", "OTR_")
 	l.v.SetDefault("security.config_file_mode", "0600")
 	l.v.SetDefault("security.audit_log.enabled", true)
-	l.v.SetDefault("security.audit_log.path", "$HOME/.openclaw/reflex/audit.log")
+	l.v.SetDefault("security.audit_log.path", "$HOME/.otr/audit.log")
 }
 
 // applyEnvOverrides applies environment variable overrides for sensitive data

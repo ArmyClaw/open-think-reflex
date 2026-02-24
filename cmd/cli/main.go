@@ -90,7 +90,7 @@ func loadConfig() (*config.Config, *config.Loader, error) {
 		return nil, nil, fmt.Errorf("failed to get home directory: %w", err)
 	}
 
-	configPath := fmt.Sprintf("%s/.openclaw/reflex", homeDir)
+	configPath := fmt.Sprintf("%s/.otr", homeDir)
 	loader := config.NewLoader(configPath, "config")
 	configLoader = loader
 	cfg, err := loader.Load()

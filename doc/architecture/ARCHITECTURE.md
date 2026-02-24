@@ -518,7 +518,7 @@ security:
   # Audit logging
   audit:
     enabled: true
-    path: ~/.openclaw/reflex/audit.log
+    path: ~/.otr/audit.log
 ```
 
 ---

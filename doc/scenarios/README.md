@@ -257,7 +257,7 @@ $ otr init
 #      openai
 #      local
 # ? Enter your API key: **********
-# ? Select data directory: ~/.openclaw/reflex
+# ? Select data directory: ~/.otr
 # ? Configure matching strategies: y
 #     - exact: enabled (default)
 #     - keyword: enabled (default)

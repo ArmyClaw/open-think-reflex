@@ -514,13 +514,13 @@ version: 1
 
 app:
   name: "open-think-reflex"
-  data_dir: "~/.openclaw/reflex"
+  data_dir: "~/.otr"
   log_level: "info"
   profile: false
 
 storage:
   type: "sqlite"
-  path: "~/.openclaw/reflex/data.db"
+  path: "~/.otr/data.db"
   cache_size: 1000
 
 ai:
@@ -561,7 +561,7 @@ security:
   config_file_mode: "0600"
   audit_log:
     enabled: true
-    path: "~/.openclaw/reflex/audit.log"
+    path: "~/.otr/audit.log"
 ```
 
 ---

@@ -425,7 +425,7 @@ CREATE INDEX idx_chains_created ON thought_chains(created_at);
 ### 7.3 数据目录结构
 
 ```
-~/.openclaw/reflex/
+~/.otr/
 ├── config.yaml              # 配置文件
 ├── reflex.db               # SQLite数据库
 ├── exports/                # 导出目录
@@ -799,20 +799,20 @@ otr project import project.json
 ### 11.1 配置文件结构
 
 ```yaml
-# ~/.openclaw/reflex/config.yaml
+# ~/.otr/config.yaml
 
 # 应用配置
 app:
   name: "open-think-reflex"
   version: "1.0.0"
-  dataDir: "~/.openclaw/reflex"
+  dataDir: "~/.otr"
   logLevel: "info"
 
 # 存储配置
 storage:
   type: "sqlite"              # sqlite | redis | postgresql
   sqlite:
-    path: "~/.openclaw/reflex/reflex.db"
+    path: "~/.otr/reflex.db"
   redis:
     host: "localhost"
     port: 6379
@@ -891,7 +891,7 @@ export:
 |------|------|------|
 | ANTHROPIC_API_KEY | Anthropic API密钥 | 当使用Claude时 |
 | OPENAI_API_KEY | OpenAI API密钥 | 当使用OpenAI时 |
-| REFLEX_DATA_DIR | 数据目录 | 否，默认~/.openclaw/reflex |
+| REFLEX_DATA_DIR | 数据目录 | 否，默认~/.otr |
 | REFLEX_LOG_LEVEL | 日志级别 | 否，默认info |
 
 ### 11.3 配置命令
@@ -1481,7 +1481,7 @@ docker pull openclaw/reflex:latest
 
 # 运行（使用本地数据卷）
 docker run -it --rm \
-  -v ~/.openclaw/reflex:/root/.openclaw/reflex \
+  -v ~/.otr:/root/.otr \
   -v $(pwd)/exports:/app/exports \
   openclaw/reflex
 
@@ -1492,7 +1492,7 @@ services:
   reflex:
     image: openclaw/reflex:latest
     volumes:
-      - ~/.openclaw/reflex:/root/.openclaw/reflex
+      - ~/.otr:/root/.otr
       - ./exports:/app/exports
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
@@ -1589,7 +1589,7 @@ docker build -t reflex-dev .
 # 运行开发模式（热重载）
 docker run -it --rm \
   -v $(pwd):/app \
-  -v ~/.openclaw/reflex:/root/.openclaw/reflex \
+  -v ~/.otr:/root/.otr \
   -e NODE_ENV=development \
   reflex-dev \
   npm run dev
@@ -1604,7 +1604,7 @@ docker build -t reflex:latest .
 # 运行
 docker run -d \
   --name reflex \
-  -v ~/.openclaw/reflex:/root/.openclaw/reflex \
+  -v ~/.otr:/root/.otr \
   -v ./exports:/app/exports \
   -e ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY} \
   -e LOG_LEVEL=info \
@@ -1649,7 +1649,7 @@ spec:
               key: anthropic-api-key
         volumeMounts:
         - name: reflex-data
-          mountPath: /root/.openclaw/reflex
+          mountPath: /root/.otr
         ports:
         - containerPort: 3000
       volumes:

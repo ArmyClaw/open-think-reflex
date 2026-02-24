@@ -128,14 +128,14 @@ func TestLoader_resolvePaths(t *testing.T) {
 	loader := NewLoader("/tmp", "config")
 	cfg := &Config{
 		App: AppConfig{
-			DataDir: "$HOME/.openclaw/reflex",
+			DataDir: "$HOME/.otr",
 		},
 		Storage: StorageConfig{
-			Path: "$HOME/.openclaw/reflex/data.db",
+			Path: "$HOME/.otr/data.db",
 		},
 		Security: SecurityConfig{
 			AuditLog: AuditConfig{
-				Path: "$HOME/.openclaw/reflex/audit.log",
+				Path: "$HOME/.otr/audit.log",
 			},
 		},
 	}
@@ -143,10 +143,10 @@ func TestLoader_resolvePaths(t *testing.T) {
 	loader.resolvePaths(cfg)
 	
 	// Check paths are resolved
-	if cfg.App.DataDir == "$HOME/.openclaw/reflex" {
+	if cfg.App.DataDir == "$HOME/.otr" {
 		t.Error("DataDir should be resolved")
 	}
-	if cfg.Storage.Path == "$HOME/.openclaw/reflex/data.db" {
+	if cfg.Storage.Path == "$HOME/.otr/data.db" {
 		t.Error("Storage.Path should be resolved")
 	}
 	
