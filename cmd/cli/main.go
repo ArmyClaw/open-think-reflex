@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -124,8 +125,14 @@ func buildCommands(storage *sqlite.Storage, cfg *config.Config, loader *config.L
 			Name:  "interactive",
 			Usage: "Launch interactive TUI mode",
 			Aliases: []string{"tui", "ui", "i"},
+			Flags: []cli.Flag{
+				&cli.BoolFlag{
+					Name:  "force",
+					Usage: "Force launch even without a proper terminal (for automation/testing)",
+				},
+			},
 			Action: func(c *cli.Context) error {
-				return runInteractive(storage)
+				return runInteractive(storage, c.Bool("force"))
 			},
 		},
 		{
@@ -1499,13 +1506,51 @@ func runQuery(storage *sqlite.Storage, query string, threshold float64) error {
 	return nil
 }
 
-func runInteractive(storage *sqlite.Storage) error {
+func runInteractive(storage *sqlite.Storage, force bool) error {
+	// Check terminal capabilities before starting TUI (skip if force flag is set)
+	if !force && !isTerminalCapable() {
+		return fmt.Errorf("interactive mode requires a capable terminal. " +
+			"Current terminal (TERM=%s) does not support TUI apps. " +
+			"Please run in a proper terminal (e.g., cmd, PowerShell, xterm, tmux) " +
+			"or use 'otr interactive --force' to try anyway",
+			os.Getenv("TERM"))
+	}
+
+	// If TERM is not set but we have /dev/tty, try to use script command
+	// This helps in containerized environments (ECS, Docker, etc.)
+	if os.Getenv("TERM") == "" {
+		fmt.Println("Starting interactive mode (via script)...")
+		
+		// Use script command to create a pseudo-TTY
+		cmd := exec.Command("script", "-q", "-c", "./otr interactive --force", "/dev/null")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Stdin = os.Stdin
+		cmd.Env = append(os.Environ(), "TERM=xterm-256color")
+		cmd.Dir = "/home/ecs-user/.openclaw/workspace/open-think-reflex"
+		
+		return cmd.Run()
+	}
+
 	fmt.Println("Starting interactive mode...")
-	
+
 	app := ui.NewApp(storage)
 	ctx := context.Background()
-	
+
 	return app.Run(ctx)
+}
+
+// isTerminalCapable checks if the current terminal can run TUI apps
+func isTerminalCapable() bool {
+	term := os.Getenv("TERM")
+
+	// Only "dumb" or empty TERM is considered not capable
+	// This allows Windows cmd/PowerShell, xterm, vt100, ANSI, etc. to work
+	if term == "" || term == "dumb" {
+		return false
+	}
+
+	return true
 }
 
 func truncate(s string, maxLen int) string {
